@@ -12,6 +12,12 @@ class AuthField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: "Enter Your $authFieldText",
             border: OutlineInputBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(
+                width: 2.0,
+                color: Color(0xff0f766e)
+              )
+            )
           ),
       ),
     );
