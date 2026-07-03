@@ -21,7 +21,7 @@ class _AuthScreenState extends State<AuthScreen> {
     super.initState();
     _tapGestureRecognizer = TapGestureRecognizer();
     _tapGestureRecognizer.onTap = () {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => SignupAuthScreen()),
       );
@@ -57,7 +57,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       textWeight: FontWeight(500),
                     ),
                     SizedBox(height: 7),
-                    AuthField(authFieldText: "Email"),
+                    AuthField(authFieldText: "Email", ),
                     SizedBox(height: 20),
                     TextWidget(
                       text: "Password",
