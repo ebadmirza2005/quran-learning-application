@@ -1,27 +1,62 @@
 import 'package:flutter/material.dart';
 
-class AuthField extends StatelessWidget {
+class AuthField extends StatefulWidget {
   final String authFieldText;
   final double fieldWidth;
   final Icon? authFieldIcon;
-  const AuthField({super.key, required this.authFieldText, this.fieldWidth = 0.85, this.authFieldIcon});
+  final TextEditingController? controller;
+  final bool isPassword;
+
+  const AuthField({
+    super.key,
+    required this.authFieldText,
+    this.fieldWidth = 0.85,
+    this.authFieldIcon,
+    this.controller,
+    this.isPassword = false,
+  });
+
+  @override
+  State<AuthField> createState() => _AuthFieldState();
+}
+
+class _AuthFieldState extends State<AuthField> {
+  bool _obscureText = true;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: MediaQuery.of(context).size.width * fieldWidth,
+      width: MediaQuery.of(context).size.width * widget.fieldWidth,
       child: TextFormField(
-          decoration: InputDecoration(
-            hintText: authFieldText,
-            border: OutlineInputBorder(),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(
-                width: 2.0,
-                color: Color(0xff0f766e)
-              )
+        controller: widget.controller,
+        obscureText: widget.isPassword ? _obscureText : false,
+        decoration: InputDecoration(
+          hintText: widget.authFieldText,
+          border: const OutlineInputBorder(),
+          focusedBorder: const OutlineInputBorder(
+            borderSide: BorderSide(
+              width: 2.0,
+              color: Color(0xff0f766e),
             ),
-              suffixIcon: authFieldIcon
           ),
+          suffixIcon: widget.isPassword
+              ? IconButton(
+            icon: Icon(
+              _obscureText ? Icons.visibility_off : Icons.visibility,
+              color: const Color(0xff0f766e),
+            ),
+            onPressed: () {
+              setState(() {
+                _obscureText = !_obscureText;
+              });
+            },
+          )
+              : widget.authFieldIcon,
+        ),
+        validator: (v) {
+          if (v == null || v.isEmpty) return "${widget.authFieldText} is required";
+          return null;
+        },
       ),
     );
   }

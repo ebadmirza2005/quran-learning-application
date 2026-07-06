@@ -1,5 +1,6 @@
 import 'package:country_picker/country_picker.dart';
 import 'package:quran_learning_application/utils/button.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/material.dart';
 import '../utils/auth_field.dart';
@@ -14,6 +15,16 @@ class SignupTutorScreen extends StatefulWidget {
 }
 
 class _SignupTutorScreenState extends State<SignupTutorScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _cityController = TextEditingController();
+
+  final _supabase = Supabase.instance.client;
+  bool _isLoading = false;
+
   String selectedValue = "Select Gender";
   String _selectedCountry = "Select Country";
   String _selectedTimeZone = "Select Timezone";
@@ -31,6 +42,75 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
 
   bool _isAgree = false;
 
+  Future<void> _signUpTutor() async {
+    if (!_isAgree) {
+      _showSnackBar('Please agree to the terms of use');
+      return;
+    }
+    if (_passwordController.text != _confirmPasswordController.text) {
+      _showSnackBar("Passwords do not match!");
+      return;
+    }
+
+    if (selectedValue == "Select Gender" || _selectedCountry == "Select Country") {
+      _showSnackBar("Please select gender and country");
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final authResponse = await _supabase.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      final user = authResponse.user;
+
+      if (user != null) {
+        List<String> selectedSkills = tutorSkills.entries
+            .where((entry) => entry.value == true)
+            .map((entry) => entry.key)
+            .toList();
+
+        await _supabase.from('tutors').insert({
+          'id': user.id,
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'gender': selectedValue,
+          'phone': _phoneController.text.trim(),
+          'country': _selectedCountry,
+          'city': _cityController.text.trim(),
+          'timezone': _selectedTimeZone,
+          'skills': selectedSkills,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        if (!mounted) return;
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
+              (Route route) => false,
+        );
+      }
+    } catch (e) {
+      _showSnackBar("Error: ${e.toString()}");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   void _loadTimeZone(Country country) async {
     String code = country.countryCode.toUpperCase();
     List<String> matchedZones = [];
@@ -43,9 +123,12 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
 
           if (parts.length > 1) {
             if (code == "US" && zoneKey.startsWith("America/")) {
-              return zoneKey.contains("New_York") || zoneKey.contains("Chicago") ||
-                  zoneKey.contains("Denver") || zoneKey.contains("Los_Angeles") ||
-                  zoneKey.contains("Anchorage") || zoneKey.contains("Honolulu");
+              return zoneKey.contains("New_York") ||
+                  zoneKey.contains("Chicago") ||
+                  zoneKey.contains("Denver") ||
+                  zoneKey.contains("Los_Angeles") ||
+                  zoneKey.contains("Anchorage") ||
+                  zoneKey.contains("Honolulu");
             }
 
             String searchName = country.name.toLowerCase().replaceAll(' ', '_');
@@ -69,11 +152,26 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
         else if (code == "AE") _availableTimeZones = ["Select Timezone", "Asia/Dubai"];
         else if (code == "GB") _availableTimeZones = ["Select Timezone", "Europe/London"];
         else {
-          _availableTimeZones = ["Select Timezone", "GMT +${country.phoneCode} (Standard Time)", "UTC"];
+          _availableTimeZones = [
+            "Select Timezone",
+            "GMT +${country.phoneCode} (Standard Time)",
+            "UTC",
+          ];
         }
         _selectedTimeZone = "Select Timezone";
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _cityController.dispose();
+    super.dispose();
   }
 
   @override
@@ -82,77 +180,89 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
     List<String> skillsKeys = tutorSkills.keys.toList();
 
     return Scaffold(
-      backgroundColor: Color(0xffd2dad2),
+      backgroundColor: const Color(0xffd2dad2),
       body: Center(
         child: SingleChildScrollView(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(height: 50,),
+              const SizedBox(height: 50),
               SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.6,
-                  child: Image.asset("assets/logo.png")),
-              const SizedBox(height: 30,),
-              const AuthField(authFieldText: "Name",),
-              const SizedBox(height: 10,),
-              const AuthField(authFieldText: "Email"),
-              const SizedBox(height: 10,),
+                width: MediaQuery.of(context).size.width * 0.6,
+                child: Image.asset("assets/logo.png"),
+              ),
+              const SizedBox(height: 30),
+              AuthField(authFieldText: "Name", controller: _nameController),
+              const SizedBox(height: 10),
+              AuthField(authFieldText: "Email", controller: _emailController),
+              const SizedBox(height: 10),
 
               SizedBox(
                 width: fieldWidth,
                 child: InputDecorator(
                   decoration: const InputDecoration(
-                      border: OutlineInputBorder()
+                    border: OutlineInputBorder(),
                   ),
                   child: DropdownButton<String>(
-                      value: selectedValue,
-                      icon: const Icon(Icons.arrow_drop_down_sharp),
-                      elevation: 16,
-                      isExpanded: true,
-                      underline: Container(
-                        height: 2,
-                        color: const Color(0xff0f766e),
+                    value: selectedValue,
+                    icon: const Icon(Icons.arrow_drop_down_sharp),
+                    elevation: 16,
+                    isExpanded: true,
+                    underline: Container(
+                      height: 2,
+                      color: const Color(0xff0f766e),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: "Select Gender",
+                        child: Text("Select Gender"),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: "Select Gender", child: Text("Select Gender")),
-                        DropdownMenuItem(value: "Male", child: Text("Male")),
-                        DropdownMenuItem(value: "Female", child: Text("Female"),),
-                      ], onChanged: (String? newValue) {
-                    setState(() {
-                      selectedValue = newValue!;
-                    });
-                  }),
+                      DropdownMenuItem(value: "Male", child: Text("Male")),
+                      DropdownMenuItem(value: "Female", child: Text("Female")),
+                    ],
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedValue = newValue!;
+                      });
+                    },
+                  ),
                 ),
               ),
-              const SizedBox(height: 10,),
-              const AuthField(authFieldText: "Phone No"),
-              const SizedBox(height: 10,),
+              const SizedBox(height: 10),
+              AuthField(authFieldText: "Phone No", controller: _phoneController),
+              const SizedBox(height: 10),
 
               SizedBox(
                 width: MediaQuery.of(context).size.width * 0.85,
                 child: Row(
-                  children: const [
-                    Expanded(child: AuthField(authFieldText: "Password")),
-                    SizedBox(width: 5,),
-                    Expanded(child: AuthField(authFieldText: "Re-Type Password")),
+                  children: [
+                    Expanded(child: AuthField(authFieldText: "Password", controller: _passwordController)),
+                    const SizedBox(width: 5),
+                    Expanded(child: AuthField(authFieldText: "Re-Type Password", controller: _confirmPasswordController)),
                   ],
                 ),
               ),
-              const SizedBox(height: 10,),
+              const SizedBox(height: 10),
 
               SizedBox(
                 width: fieldWidth,
                 child: InkWell(
                   onTap: () {
-                    showCountryPicker(context: context, onSelect: (Country country) {
-                      setState(() {
-                        _selectedCountry = "${country.name} (${country.countryCode}) ${country.flagEmoji}";
-                      });
-                      _loadTimeZone(country);
-                    });
+                    showCountryPicker(
+                      context: context,
+                      onSelect: (Country country) {
+                        setState(() {
+                          _selectedCountry = "${country.name} (${country.countryCode}) ${country.flagEmoji}";
+                        });
+                        _loadTimeZone(country);
+                      },
+                    );
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey),
                       borderRadius: BorderRadius.circular(4),
@@ -163,8 +273,10 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                         Text(
                           _selectedCountry,
                           style: TextStyle(
-                              fontSize: 16,
-                              color: _selectedCountry == "Select Country" ? Colors.grey[600] : Colors.black
+                            fontSize: 16,
+                            color: _selectedCountry == "Select Country"
+                                ? Colors.grey[600]
+                                : Colors.black,
                           ),
                         ),
                         const Icon(Icons.arrow_drop_down_sharp),
@@ -173,9 +285,9 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10,),
-              const AuthField(authFieldText: "City"),
-              const SizedBox(height: 10,),
+              const SizedBox(height: 10),
+              AuthField(authFieldText: "City", controller: _cityController),
+              const SizedBox(height: 10),
 
               SizedBox(
                 width: fieldWidth,
@@ -184,48 +296,57 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                     border: OutlineInputBorder(),
                   ),
                   child: DropdownButton<String>(
-                      value: _selectedTimeZone,
-                      icon: const Icon(Icons.access_time, color: Color(0xff0f766e),),
-                      isExpanded: true,
-                      underline: Container(height: 2, color: const Color(0xff0f766e),),
-                      items: _availableTimeZones.map((String timezone) {
-                        return DropdownMenuItem<String>(
-                            value: timezone,
-                            child: Text(
-                              timezone,
-                              style: TextStyle(
-                                  color: timezone == "Select Timezone" ? Colors.grey[700] : Colors.black
-                              ),
-                            ));
-                      }).toList(),
-                      onChanged: _selectedCountry == "Select Country" ? null : (String? newValue) {
-                        setState(() {
-                          _selectedTimeZone = newValue!;
-                        });
-                      }
+                    value: _selectedTimeZone,
+                    icon: const Icon(
+                      Icons.access_time,
+                      color: Color(0xff0f766e),
+                    ),
+                    isExpanded: true,
+                    underline: Container(
+                      height: 2,
+                      color: const Color(0xff0f766e),
+                    ),
+                    items: _availableTimeZones.map((String timezone) {
+                      return DropdownMenuItem<String>(
+                        value: timezone,
+                        child: Text(
+                          timezone,
+                          style: TextStyle(
+                            color: timezone == "Select Timezone"
+                                ? Colors.grey[700]
+                                : Colors.black,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: _selectedCountry == "Select Country"
+                        ? null
+                        : (String? newValue) {
+                      setState(() {
+                        _selectedTimeZone = newValue!;
+                      });
+                    },
                   ),
                 ),
               ),
-              const SizedBox(height: 15,),
+              const SizedBox(height: 15),
 
               SizedBox(
                 width: fieldWidth,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextWidget(
+                    const TextWidget(
                       text: "I can teach",
-                      textColor: const Color(0xff0f766e),
+                      textColor: Color(0xff0f766e),
                       textWeight: FontWeight.bold,
                     ),
-                    const SizedBox(height: 5,),
+                    const SizedBox(height: 5),
 
                     for (int i = 0; i < skillsKeys.length; i += 2) ...[
                       Row(
                         children: [
-                          Expanded(
-                            child: _buildSkillItem(skillsKeys[i]),
-                          ),
+                          Expanded(child: _buildSkillItem(skillsKeys[i])),
                           const SizedBox(width: 10),
                           Expanded(
                             child: (i + 1 < skillsKeys.length)
@@ -234,11 +355,11 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                           ),
                         ],
                       ),
-                    ]
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 10,),
+              const SizedBox(height: 10),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -247,25 +368,32 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                     value: _isAgree,
                     onChanged: (bool? value) {
                       setState(() {
-                         _isAgree = value!;
+                        _isAgree = value!;
                       });
                     },
                   ),
-                  Row(
+                  const Row(
                     children: [
+                      TextWidget(text: "By signing up, you agree to our "),
                       TextWidget(
-                        text: "By signing up, you agree to our ",
+                        text: "terms of use",
+                        textColor: Color(0xff0f766e),
                       ),
-                      TextWidget(text: "terms of use", textColor: Color(0xff0f766e))
                     ],
                   ),
                 ],
               ),
-              SizedBox(height: 10,),
-              ElevatedButtonWidget(buttonText: "Sign Up", onTap: () {
-                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => TutorHomeScreen()));
-              }, buttonColor: Color(0xff0f766e), textColor: Colors.white,),
-              SizedBox(height: 30,),
+              const SizedBox(height: 10),
+
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
+                  : ElevatedButtonWidget(
+                buttonText: "Sign Up",
+                onTap: _signUpTutor,
+                buttonColor: const Color(0xff0f766e),
+                textColor: Colors.white,
+              ),
+              const SizedBox(height: 30),
             ],
           ),
         ),
@@ -286,11 +414,7 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
             });
           },
         ),
-        Flexible(
-          child: TextWidget(
-            text: skillName,
-          ),
-        ),
+        Flexible(child: TextWidget(text: skillName)),
       ],
     );
   }

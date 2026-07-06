@@ -36,6 +36,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   country_picker: ^2.0.28
   timezone: ^0.11.1
+  bottom_navy_bar: ^6.1.0
+  flutter_zoom_drawer: ^3.2.0
+  supabase_flutter: ^2.15.4
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +66,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
