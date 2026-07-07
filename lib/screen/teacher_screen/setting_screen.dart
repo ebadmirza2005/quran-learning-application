@@ -16,6 +16,8 @@ class SettingScreen extends StatefulWidget {
 class _SettingScreenState extends State<SettingScreen> {
   final supabase = Supabase.instance.client;
   String tutorName = "Loading...";
+  String? profileImageUrl; // Image URL store karne ke liye variable
+  bool isLoadingImage = true; // Image loading state track karne ke liye
 
   @override
   void initState() {
@@ -28,9 +30,10 @@ class _SettingScreenState extends State<SettingScreen> {
       final user = supabase.auth.currentUser;
 
       if (user != null) {
+        // Yahan 'name' ke sath 'profile_image' column ko bhi select kiya hai
         final data = await supabase
             .from('tutors')
-            .select('name')
+            .select('name, profile_image')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -39,6 +42,7 @@ class _SettingScreenState extends State<SettingScreen> {
         setState(() {
           if (data != null) {
             tutorName = data['name'] ?? "No Name Found";
+            profileImageUrl = data['profile_image']; // URL state mein save kiya
           } else {
             tutorName = "Profile Not Found";
           }
@@ -50,6 +54,12 @@ class _SettingScreenState extends State<SettingScreen> {
         tutorName = "Error Loading Name";
       });
       print("Fetch Error: ${e.toString()}");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingImage = false;
+        });
+      }
     }
   }
 
@@ -67,18 +77,34 @@ class _SettingScreenState extends State<SettingScreen> {
               children: [
                 Column(
                   children: [
-                    const Stack(
+                    // --- Profile Image Stack Section ---
+                    Stack(
                       alignment: Alignment.center,
                       children: [
                         CircleAvatar(
                           radius: 40,
-                          backgroundColor: Color(0xff0f766e),
+                          backgroundColor: const Color(0xff0f766e),
+                          // Agar URL maujood ho to NetworkImage show karega, warna null
+                          backgroundImage: (profileImageUrl != null && profileImageUrl!.isNotEmpty)
+                              ? NetworkImage(profileImageUrl!)
+                              : null,
+                          // Agar image loading mein ho ya URL na ho to default widget dikhayega
+                          child: (profileImageUrl == null || profileImageUrl!.isEmpty)
+                              ? const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 40,
+                          )
+                              : null,
                         ),
-                        Icon(
-                          Icons.photo,
-                          color: Colors.white,
-                          size: 30,
-                        ),
+                        // Loading spinner agar network image fetch ho rahi ho
+                        if (isLoadingImage)
+                          const Positioned.fill(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 10,),
@@ -95,7 +121,7 @@ class _SettingScreenState extends State<SettingScreen> {
                       children: [
                         const Icon(Icons.person, color: Color(0xff0f766e),),
                         TextButtonWidget(buttonText: "Personal Info", onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => TutorPersonalInfo()));
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const TutorPersonalInfo()));
                         },
                         )
                       ],

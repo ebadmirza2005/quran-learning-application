@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,6 +21,10 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
+
+  File? _imageFile;
+  String? _imageUrl;
+  final ImagePicker _picker = ImagePicker();
 
   List<String> _selectedLanguages = [];
   final List<String> _languagesList = [
@@ -48,7 +54,6 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
     _fetchTutorData();
   }
 
-  // --- Supabase Se Data Fetch Karna ---
   Future<void> _fetchTutorData() async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
@@ -69,8 +74,9 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
           if (data['email'] != null) _emailController.text = data['email'];
           _phoneController.text = data['phone'] ?? '';
           _dobController.text = data['dob'] ?? '';
-
           _selectedLanguages = List<String>.from(data['languages'] ?? []);
+
+          _imageUrl = data['profile_image'];
 
           List<dynamic> savedSkills = data['skills'] ?? [];
           for (var skill in savedSkills) {
@@ -91,7 +97,6 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
     }
   }
 
-  // --- Data Supabase Mein Save Karna ---
   Future<void> _saveTutorData() async {
     setState(() {
       _isLoading = true;
@@ -100,6 +105,25 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
+
+      String? finalImageUrl = _imageUrl;
+
+      if (_imageFile != null) {
+        final fileExtension = _imageFile!.path.split('.').last;
+        final path = '${user.id}/profile.$fileExtension';
+
+        await Supabase.instance.client.storage
+            .from('avatars')
+            .upload(
+          path,
+          _imageFile!,
+          fileOptions: const FileOptions(upsert: true),
+        );
+
+        finalImageUrl = Supabase.instance.client.storage
+            .from('avatars')
+            .getPublicUrl(path);
+      }
 
       List<String> selectedSkills = [];
       tutorSkills.forEach((key, value) {
@@ -114,37 +138,125 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
         'dob': _dobController.text,
         'languages': _selectedLanguages,
         'skills': selectedSkills,
+        'profile_image': finalImageUrl,
       });
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
-      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
+        );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xff0f766e),
-          content: Text("Profile Saved Successfully!"),
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xff0f766e),
+            content: Text("Profile Saved Successfully!"),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error Saving data: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error Saving data: $e")),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  // --- Date Picker Function ---
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error picking image: $e")),
+      );
+    }
+  }
+
+  // Handle Image Display (Local File vs Network URL)
+  ImageProvider? _getProfileImage() {
+    if (_imageFile != null) {
+      return FileImage(_imageFile!); // Jab nayi image select ho
+    } else if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+      return NetworkImage(_imageUrl!); // Jab database se purani image load ho
+    }
+    return null;
+  }
+
+  void _showImageSourceBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const TextWidget(
+                text: "Select Profile Picture",
+                textWeight: FontWeight.bold,
+                textSize: 18,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff0f766e),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _pickImage(ImageSource.camera);
+                    },
+                    icon: const Icon(Icons.camera_alt),
+                    label: const Text("Camera"),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff0f766e),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _pickImage(ImageSource.gallery);
+                    },
+                    icon: const Icon(Icons.image),
+                    label: const Text("Gallery"),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _selectDate(BuildContext context) async {
     DateTime? pickedDate = await showDatePicker(
       context: context,
-      // Calendar khulega to default yeh saal samne aayega
       initialDate: DateTime(2000, 1, 1),
-      // 1950 select karne ke liye firstDate bilkul theek hai
       firstDate: DateTime(1950),
       lastDate: DateTime.now(),
       builder: (context, child) {
@@ -167,7 +279,6 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
     );
 
     if (pickedDate != null) {
-      // FIX: 'dd-mm-yyyy' ko badal kar 'dd-MM-yyyy' kiya (MM = Month)
       String formattedDate = DateFormat('dd-MM-yyyy').format(pickedDate);
       setState(() {
         _dobController.text = formattedDate;
@@ -175,7 +286,6 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
     }
   }
 
-  // --- Multiple Languages Ki Bottom Sheet Dikhana ---
   void _showMultiSelectBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -281,14 +391,32 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               const SizedBox(height: 30),
-              const Stack(
-                alignment: Alignment.center,
+
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
                   CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Color(0xff0f766e),
+                    radius: 50,
+                    backgroundColor: const Color(0xff0f766e),
+                    backgroundImage: _getProfileImage(),
+                    child: _getProfileImage() == null
+                        ? const Icon(Icons.person, color: Colors.white, size: 50)
+                        : null,
                   ),
-                  Icon(Icons.photo, color: Colors.white, size: 30),
+                  Positioned(
+                    bottom: 0,
+                    right: -4,
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.grey.shade200,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.edit, color: Color(0xff0f766e), size: 18),
+                        onPressed: () => _showImageSourceBottomSheet(context),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -326,7 +454,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
               ),
               const SizedBox(height: 10),
 
-              // --- Custom Date of Birth Picker ---
+              // Date of Birth
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -338,7 +466,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                       width: fieldWidth,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Color(0xffd2dad2),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade400),
                       ),
@@ -346,7 +474,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _dobController.text.isEmpty ? "dd-mm-yyyy" : _dobController.text,
+                            _dobController.text.isEmpty ? "dd-MM-yyyy" : _dobController.text,
                             style: TextStyle(
                               color: _dobController.text.isEmpty ? Colors.grey.shade600 : Colors.black,
                               fontSize: 16,
@@ -361,7 +489,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
               ),
               const SizedBox(height: 10),
 
-              // --- Multi-Select Languages Field ---
+              // Languages
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -373,7 +501,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                       width: fieldWidth,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Color(0xffd2dad2),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade400),
                       ),
@@ -401,7 +529,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
               ),
               const SizedBox(height: 10),
 
-              // Skills (I can teach)
+              // Skills
               SizedBox(
                 width: fieldWidth,
                 child: Column(
