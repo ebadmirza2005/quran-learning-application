@@ -40,6 +40,7 @@ dependencies:
   flutter_zoom_drawer: ^3.2.0
   supabase_flutter: ^2.15.4
   flutter_dotenv: ^6.0.1
+  intl: ^0.20.3
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:quran_learning_application/screen/tutor_home_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -16,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _startLogoTimer();
-    _splashToLogin();
+    _navigateToNextScreen();
   }
 
   void _startLogoTimer() async {
@@ -29,13 +31,19 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  void _splashToLogin() {
-    Timer(Duration(seconds: 5), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => AuthScreen()),
-      );
-    });
+  Future<void> _navigateToNextScreen() async {
+    await Future.delayed(const Duration(seconds: 5));
+
+    if (!mounted) return;
+
+    final session = Supabase.instance.client.auth.currentSession;
+
+    if (session != null) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
+    }else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+    }
+
   }
 
   @override

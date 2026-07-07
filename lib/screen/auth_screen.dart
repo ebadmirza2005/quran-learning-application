@@ -110,7 +110,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 7),
                     AuthField(
-                      authFieldText: "Email",
+                      authFieldText: "someone@example.com",
                       controller: _emailController,
                     ),
                     const SizedBox(height: 20),
@@ -121,7 +121,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 7),
                     AuthField(
-                      authFieldText: "Password",
+                      authFieldText: "••••••••",
                       controller: _passwordController,
                     ),
                     TextButtonWidget(buttonText: "Forgot Password?"),

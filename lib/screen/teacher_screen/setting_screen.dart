@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
 import '../auth_screen.dart';
+import 'tutor_personal_info.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -88,53 +89,50 @@ class _SettingScreenState extends State<SettingScreen> {
                 ),
 
                 SizedBox(height: _height * 0.1,),
-                const Column(
+                Column(
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.person, color: Color(0xff0f766e),),
-                        SizedBox(width: 10,),
-                        TextWidget(text: "Personal Info",)
+                        const Icon(Icons.person, color: Color(0xff0f766e),),
+                        TextButtonWidget(buttonText: "Personal Info", onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => TutorPersonalInfo()));
+                        },
+                        )
                       ],
                     ),
-                    SizedBox(height: 15,),
-                    Row(
+                    const SizedBox(height: 10,),
+                    const Row(
                       children: [
                         Icon(Icons.edit_square, color: Color(0xff0f766e),),
-                        SizedBox(width: 10,),
-                        TextWidget(text: "Edit Info",)
+                        TextButtonWidget(buttonText: "Edit Info",)
                       ],
                     ),
-                    SizedBox(height: 15,),
-                    Row(
+                    const SizedBox(height: 10,),
+                    const Row(
                       children: [
                         Icon(Icons.location_on, color: Color(0xff0f766e),),
-                        SizedBox(width: 10,),
-                        TextWidget(text: "Location",)
+                        TextButtonWidget(buttonText: "Location",)
                       ],
                     ),
-                    SizedBox(height: 15,),
-                    Row(
+                    const SizedBox(height: 10,),
+                    const Row(
                       children: [
                         Icon(Icons.lock, color: Color(0xff0f766e),),
-                        SizedBox(width: 10,),
-                        TextWidget(text: "Change Password",)
+                        TextButtonWidget(buttonText: "Change Password",)
                       ],
                     ),
-                    SizedBox(height: 15,),
-                    Row(
+                    const SizedBox(height: 10,),
+                    const Row(
                       children: [
                         Icon(Icons.laptop, color: Color(0xff0f766e),),
-                        SizedBox(width: 10,),
-                        TextWidget(text: "Classroom Demo",)
+                        TextButtonWidget(buttonText: "Classroom Demo",)
                       ],
                     ),
-                    SizedBox(height: 15,),
-                    Row(
+                    const SizedBox(height: 10,),
+                    const Row(
                       children: [
                         Icon(Icons.contact_mail, color: Color(0xff0f766e),),
-                        SizedBox(width: 10,),
-                        TextWidget(text: "Contact Us",)
+                        TextButtonWidget(buttonText: "Contact Us",)
                       ],
                     ),
                   ],

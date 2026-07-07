@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 class TextButtonWidget extends StatelessWidget {
   final String buttonText;
-  const TextButtonWidget({super.key, required this.buttonText});
+  final VoidCallback? onTap;
+  const TextButtonWidget({super.key, required this.buttonText, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(onPressed: () {}, child: Text(buttonText, style: TextStyle(
+    return TextButton(onPressed: onTap, child: Text(buttonText, style: TextStyle(
       color: Colors.black
     ),));
   }
