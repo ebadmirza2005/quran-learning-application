@@ -2,7 +2,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 // =========================================================================
-// 🔥 MUKAMMAL QUTOR-STYLE NOORANI QAIDA DATA (All Important Lessons & Pages)
+// 🔥 MUKAMMAL PRODUCTION-READY DATA MODEL
 // =========================================================================
 class QaidaLessonModel {
   final int id;
@@ -22,17 +22,32 @@ class QaidaLessonModel {
   });
 }
 
+// Helper wrapper to process book-wide global page flattening
+class FlatPageModel {
+  final QaidaLessonModel lesson;
+  final int pageWithinLesson;
+  final List<Map<String, dynamic>> words;
+
+  FlatPageModel({
+    required this.lesson,
+    required this.pageWithinLesson,
+    required this.words,
+  });
+}
+
+// =========================================================================
+// 🗂️ COMPLETELY FLATTENED 27-PAGES MAPPED NOORANI QAIDA DATABASE
+// =========================================================================
 final List<QaidaLessonModel> completeNooraniQaida = [
   // --- LESSON 1: Huroof e Mufradat (Page 1 - 2) ---
   QaidaLessonModel(
-    id: 1,
-    lessonNumber: 1,
-    titleEnglish: "Lesson 1: Alphabets",
+    id: 1, lessonNumber: 1,
+    titleEnglish: "Lesson 1: Individual Alphabets",
     titleArabic: "حُرُوفُ الْهِجَاءِ الْمُفْرَدَةِ",
     totalPages: 2,
     words: [
       // Page 1
-      {"word_arabic": "ا", "word_name": "أَلِف", "page": 1, "audio": "https://server8.mp3quran.net/afs/001.mp3"},
+      {"word_arabic": "ا", "word_name": "أَلِف", "page": 1, "audio": null},
       {"word_arabic": "ب", "word_name": "بَا", "page": 1, "audio": null},
       {"word_arabic": "ت", "word_name": "تَا", "page": 1, "audio": null},
       {"word_arabic": "ث", "word_name": "ثَا", "page": 1, "audio": null},
@@ -68,13 +83,12 @@ final List<QaidaLessonModel> completeNooraniQaida = [
 
   // --- LESSON 2: Huroof e Murakkabat (Page 3 - 5) ---
   QaidaLessonModel(
-    id: 2,
-    lessonNumber: 2,
+    id: 2, lessonNumber: 2,
     titleEnglish: "Lesson 2: Joint Letters",
-    titleArabic: "حُرُوفُ الْهِجَاءِ الْمُرَكَّبَةِ",
+    titleArabic: "حُرُوفُ الْهِجَاءِ الْمُرَكَّبَةِ",
     totalPages: 3,
     words: [
-      // Page 1 of Lesson 2 (Page 3 Overall)
+      // Page 3
       {"word_arabic": "لا", "word_name": "لاَم أَلِف", "page": 1, "audio": null},
       {"word_arabic": "بَا", "word_name": "بَا أَلِف", "page": 1, "audio": null},
       {"word_arabic": "نَا", "word_name": "نُون أَلِف", "page": 1, "audio": null},
@@ -83,15 +97,13 @@ final List<QaidaLessonModel> completeNooraniQaida = [
       {"word_arabic": "جَا", "word_name": "جِيم أَلِف", "page": 1, "audio": null},
       {"word_arabic": "حَا", "word_name": "حَا أَلِف", "page": 1, "audio": null},
       {"word_arabic": "خَا", "word_name": "خَا أَلِف", "page": 1, "audio": null},
-      {"word_arabic": "سَا", "word_name": "سِين أَلِف", "page": 1, "audio": null},
-      {"word_arabic": "شَا", "word_name": "شِين أَلِف", "page": 1, "audio": null},
-      // Page 2 of Lesson 2 (Page 4 Overall)
+      // Page 4
       {"word_arabic": "بب", "word_name": "بَا بَا", "page": 2, "audio": null},
       {"word_arabic": "بت", "word_name": "بَا تَا", "page": 2, "audio": null},
       {"word_arabic": "بح", "word_name": "بَا حَا", "page": 2, "audio": null},
       {"word_arabic": "بل", "word_name": "بَا لاَم", "page": 2, "audio": null},
       {"word_arabic": "تم", "word_name": "تَا مِيم", "page": 2, "audio": null},
-      // Page 3 of Lesson 2 (Page 5 Overall)
+      // Page 5
       {"word_arabic": "نـن", "word_name": "نُون نُون", "page": 3, "audio": null},
       {"word_arabic": "ثـث", "word_name": "ثَا ثَا", "page": 3, "audio": null},
       {"word_arabic": "تـث", "word_name": "تَا ثَا", "page": 3, "audio": null},
@@ -100,10 +112,9 @@ final List<QaidaLessonModel> completeNooraniQaida = [
 
   // --- LESSON 3: Huroof e Muqatta'at (Page 6) ---
   QaidaLessonModel(
-    id: 3,
-    lessonNumber: 3,
+    id: 3, lessonNumber: 3,
     titleEnglish: "Lesson 3: Shortened Letters",
-    titleArabic: "حُرُوفُ الْمُقَطَّعَاتِ",
+    titleArabic: "حُرُوفُ الْمُقَطَّعَاتِ",
     totalPages: 1,
     words: [
       {"word_arabic": "الٓمٓ", "word_name": "الم", "page": 1, "audio": null},
@@ -112,120 +123,172 @@ final List<QaidaLessonModel> completeNooraniQaida = [
       {"word_arabic": "الٓمٓر", "word_name": "المر", "page": 1, "audio": null},
       {"word_arabic": "كٓهٰيٰعٓصٓ", "word_name": "كهيعص", "page": 1, "audio": null},
       {"word_arabic": "طٰهٰ", "word_name": "طه", "page": 1, "audio": null},
-      {"word_arabic": "طٓسٓمٓ", "word_name": "طسم", "page": 1, "audio": null},
-      {"word_arabic": "طٰسٓ", "word_name": "طس", "page": 1, "audio": null},
-      {"word_arabic": "يٰسٓ", "word_name": "يس", "page": 1, "audio": null},
-      {"word_arabic": "صٓ", "word_name": "صاد", "page": 1, "audio": null},
     ],
   ),
 
-  // --- LESSON 4: Harakat (Page 7 - 9) ---
+  // --- LESSON 4: Harakat (Page 7 - 8) ---
   QaidaLessonModel(
-    id: 4,
-    lessonNumber: 4,
+    id: 4, lessonNumber: 4,
     titleEnglish: "Lesson 4: Movements (Harakat)",
-    titleArabic: "الْحَرَكَاتُ: فَتحَة، كَسْرَة، ضَمَّة",
-    totalPages: 1,
+    titleArabic: "الْحَرَكَاتُ",
+    totalPages: 2,
     words: [
-      {"word_arabic": "أَ", "word_name": "هَمزة فَتحَة", "page": 1, "audio": null},
-      {"word_arabic": "إِ", "word_name": "هَمزة كَسْرَة", "page": 1, "audio": null},
-      {"word_arabic": "أُ", "word_name": "هَمزة ضَمَّة", "page": 1, "audio": null},
+      // Page 7
+      {"word_arabic": "أَ", "word_name": "هَمْزَة فَتحَة", "page": 1, "audio": null},
+      {"word_arabic": "إِ", "word_name": "هَمْزَة كَسْرَة", "page": 1, "audio": null},
+      {"word_arabic": "أُ", "word_name": "هَمْزَة ضَمَّة", "page": 1, "audio": null},
       {"word_arabic": "بَ", "word_name": "بَا فَتحَة", "page": 1, "audio": null},
       {"word_arabic": "بِ", "word_name": "بَا كَسْرَة", "page": 1, "audio": null},
       {"word_arabic": "بُ", "word_name": "بَا ضَمَّة", "page": 1, "audio": null},
+      // Page 8
+      {"word_arabic": "تَ", "word_name": "تَا فَتحَة", "page": 2, "audio": null},
+      {"word_arabic": "تِ", "word_name": "تَا كَسْرَة", "page": 2, "audio": null},
+      {"word_arabic": "تُ", "word_name": "تَا ضَمَّة", "page": 2, "audio": null},
+    ],
+  ),
+
+  // --- LESSON 5: Tanween (Page 9 - 10) ---
+  QaidaLessonModel(
+    id: 5, lessonNumber: 5,
+    titleEnglish: "Lesson 5: Double Movements (Tanween)",
+    titleArabic: "التَّنْوِينُ: فَتْحَتَانِ كَسْرَتَانِ ضَمَّتَانِ",
+    totalPages: 2,
+    words: [
+      {"word_arabic": "اً", "word_name": "مِيم فَتْحَتَانِ", "page": 1, "audio": null},
+      {"word_arabic": "ٍ", "word_name": "مِيم كَسْرَتَانِ", "page": 1, "audio": null},
+      {"word_arabic": "ٌ", "word_name": "مِيم ضَمَّتَانِ", "page": 1, "audio": null},
+      {"word_arabic": "باً", "word_name": "بَا فَتْحَتَانِ", "page": 2, "audio": null},
+      {"word_arabic": "بٍ", "word_name": "بَا كَسْرَتَانِ", "page": 2, "audio": null},
+      {"word_arabic": "بٌ", "word_name": "بَا ضَمَّتَانِ", "page": 2, "audio": null},
+    ],
+  ),
+
+  // --- LESSON 6: Exercises of Harakat & Tanween (Page 11 - 13) ---
+  QaidaLessonModel(
+    id: 6, lessonNumber: 6,
+    titleEnglish: "Lesson 6: Mashq (Exercises)",
+    titleArabic: "تَمْرِيناتٌ عَلَی الْحَرَكَاتِ وَالتَّنْوِينِ",
+    totalPages: 3,
+    words: [
+      {"word_arabic": "أَبَدًا", "word_name": "أَبَدًا", "page": 1, "audio": null},
+      {"word_arabic": "أَحَدٌ", "word_name": "أَحَدٌ", "page": 1, "audio": null},
+      {"word_arabic": "أَخَذَ", "word_name": "أَخَذَ", "page": 2, "audio": null},
+      {"word_arabic": "بَرَرَةٍ", "word_name": "بَرَرَةٍ", "page": 2, "audio": null},
+      {"word_arabic": "جَعَلَ", "word_name": "جَعَلَ", "page": 3, "audio": null},
+      {"word_arabic": "حَسَدَ", "word_name": "حَسَدَ", "page": 3, "audio": null},
+    ],
+  ),
+
+  // --- LESSON 7: Khari Harakat (Page 14 - 15) ---
+  QaidaLessonModel(
+    id: 7, lessonNumber: 7,
+    titleEnglish: "Lesson 7: Vertical Movements",
+    titleArabic: "الْحَرَكَاتُ الْقَائِمَةُ",
+    totalPages: 2,
+    words: [
+      {"word_arabic": "هٰذَا", "word_name": "خَارَا فَتحَة", "page": 1, "audio": null},
+      {"word_arabic": "ذٰلِكَ", "word_name": "ذَال خَارَا", "page": 2, "audio": null},
+    ],
+  ),
+
+  // --- LESSON 8: Huroof Maddah o Leen (Page 16 - 18) ---
+  QaidaLessonModel(
+    id: 8, lessonNumber: 8,
+    titleEnglish: "Lesson 8: Letters of Madd & Leen",
+    titleArabic: "حُرُوفُ الْمَدَّ وَاللِّينِ",
+    totalPages: 3,
+    words: [
+      {"word_arabic": "بَا", "word_name": "بَا أَلِف مَدّ", "page": 1, "audio": null},
+      {"word_arabic": "بُو", "word_name": "بَا وَاو مَدّ", "page": 2, "audio": null},
+      {"word_arabic": "بِي", "word_name": "بَا يَا مَدّ", "page": 3, "audio": null},
+    ],
+  ),
+
+  // --- LESSON 9: Exercises of Madd, Leen & Khari Harakat (Page 19 - 21) ---
+  QaidaLessonModel(
+    id: 9, lessonNumber: 9,
+    titleEnglish: "Lesson 9: Combined Long Vowels Exercises",
+    titleArabic: "تَمْرِيناتٌ عَلَی الْمَدِّ وَاللِّينِ",
+    totalPages: 3,
+    words: [
+      {"word_arabic": "آمَنَ", "word_name": "آمَنَ", "page": 1, "audio": null},
+      {"word_arabic": "أُوْتِيَ", "word_name": "أُوْتِيَ", "page": 2, "audio": null},
+      {"word_arabic": "جَاءَ", "word_name": "جَاءَ", "page": 3, "audio": null},
+    ],
+  ),
+
+  // --- LESSON 10: Sukoon / Jazam (Page 22 - 24) ---
+  QaidaLessonModel(
+    id: 10, lessonNumber: 10,
+    titleEnglish: "Lesson 10: Sukoon (Quiescence)",
+    titleArabic: "السُّكُونُ (الْجَزْمُ)",
+    totalPages: 3,
+    words: [
+      {"word_arabic": "أَبْ", "word_name": "هَمْزَة بَا فَتْحَ بَبْ", "page": 1, "audio": null},
+      {"word_arabic": "أَتْ", "word_name": "هَمْزَة تَا فَتْحَ تَتْ", "page": 2, "audio": null},
+      {"word_arabic": "أَثْ", "word_name": "هَمْزَة ثَا فَتْحَ ثَثْ", "page": 3, "audio": null},
+    ],
+  ),
+
+  // --- LESSON 11: Exercises of Sukoon (Page 25 - 27) ---
+  QaidaLessonModel(
+    id: 11, lessonNumber: 11,
+    titleEnglish: "Lesson 11: Exercises of Sukoon",
+    titleArabic: "تَمْرِيناتٌ عَلَی السُّكُونِ",
+    totalPages: 3,
+    words: [
+      {"word_arabic": "خَلَقْنَا", "word_name": "خَلَقْنَا", "page": 1, "audio": null},
+      {"word_arabic": "مِنْ عِلْمٍ", "word_name": "مِنْ عِلْمٍ", "page": 2, "audio": null},
+      {"word_arabic": "وَانْحَرْ", "word_name": "وَانْحَرْ", "page": 3, "audio": null},
     ],
   ),
 ];
 
 // =========================================================================
-// 1. MAIN TAB (Sabaq ki List Screen)
+// 1. DUAL CODE APP DESIGN - BOARD & BOOK INTEGRATED TAB
 // =========================================================================
-class QaidaIndexTab extends StatelessWidget {
+class QaidaIndexTab extends StatefulWidget {
   const QaidaIndexTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xfff3f4f6),
-      body: ListView.builder(
-        itemCount: completeNooraniQaida.length,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        itemBuilder: (context, index) {
-          final lesson = completeNooraniQaida[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            elevation: 1,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            color: Colors.white,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              leading: CircleAvatar(
-                backgroundColor: const Color(0xff0f766e),
-                foregroundColor: Colors.white,
-                child: Text(lesson.lessonNumber.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              title: Text(
-                lesson.titleEnglish,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xff1f2937)),
-              ),
-              subtitle: Text("Total Pages: ${lesson.totalPages}", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-              trailing: Text(
-                lesson.titleArabic,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xff0f766e), fontFamily: 'QuranFont'),
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => QaidaDetailScreen(lesson: lesson),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
+  State<QaidaIndexTab> createState() => _QaidaIndexTabState();
 }
 
-// =========================================================================
-// 2. DETAILED SCREEN (Qutor Book Grid & Board View)
-// =========================================================================
-class QaidaDetailScreen extends StatefulWidget {
-  final QaidaLessonModel lesson;
-  const QaidaDetailScreen({super.key, required this.lesson});
-
-  @override
-  State<QaidaDetailScreen> createState() => _QaidaDetailScreenState();
-}
-
-class _QaidaDetailScreenState extends State<QaidaDetailScreen> {
+class _QaidaIndexTabState extends State<QaidaIndexTab> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final PageController _pageController = PageController();
 
-  Map<int, List<Map<String, dynamic>>> _pagesMap = {};
-  List<int> _pageNumbers = [];
+  List<FlatPageModel> _globalPages = [];
   int _currentPageIndex = 0;
+
+  // Drawing States (Whiteboard Integration variables)
+  final List<Offset?> _points = [];
+  Color _selectedColor = const Color(0xffdc2626);
+  double _strokeWidth = 6.0;
+  bool _isWhiteboardActive = false; // Toggle tool layer over current word cells
 
   @override
   void initState() {
     super.initState();
-    _groupWordsByPage();
+    _flattenQaidaPages();
   }
 
-  void _groupWordsByPage() {
-    Map<int, List<Map<String, dynamic>>> temporaryMap = {};
-    for (var word in widget.lesson.words) {
-      int page = word['page'] ?? 1;
-      if (!temporaryMap.containsKey(page)) {
-        temporaryMap[page] = [];
+  void _flattenQaidaPages() {
+    List<FlatPageModel> tempPages = [];
+    for (var lesson in completeNooraniQaida) {
+      for (int p = 1; p <= lesson.totalPages; p++) {
+        var pageWords = lesson.words.where((w) => (w['page'] ?? 1) == p).toList();
+        if (pageWords.isNotEmpty) {
+          tempPages.add(FlatPageModel(
+            lesson: lesson,
+            pageWithinLesson: p,
+            words: pageWords,
+          ));
+        }
       }
-      temporaryMap[page]!.add(word);
     }
     setState(() {
-      _pagesMap = temporaryMap;
-      _pageNumbers = temporaryMap.keys.toList()..sort();
+      _globalPages = tempPages;
     });
   }
 
@@ -238,45 +301,53 @@ class _QaidaDetailScreenState extends State<QaidaDetailScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    _pageController.dispose();
-    super.dispose();
+  String getArabicLessonNumber(int num) {
+    List<String> arabicNumbers = ["الأَوَّل", "الثَّانِي", "الثَّالِث", "الرَّابِع", "الْخَامِس", "السَّادِس", "السَّابِع", "الثَّامِن", "التَّاسِع", "العَاشِر", "الحَادِي عَشَر"];
+    return num <= arabicNumbers.length ? "اَلدَّرْسُ ${arabicNumbers[num - 1]}" : "اَلدَّرْسُ $num";
   }
 
   @override
   Widget build(BuildContext context) {
-    String getArabicLessonNumber(int num) {
-      List<String> arabicNumbers = ["الأَوَّل", "الثَّانِي", "الثَّالِث", "الرَّابِع", "الْخَامِس"];
-      return num <= arabicNumbers.length ? "اَلدَّرْسُ ${arabicNumbers[num - 1]}" : "اَلدَّرْسُ $num";
+    if (_globalPages.isEmpty) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xff0f766e))));
     }
+
+    final currentFlatPage = _globalPages[_currentPageIndex];
+    final currentLesson = currentFlatPage.lesson;
 
     return Scaffold(
       backgroundColor: const Color(0xfffcfdfa),
+      // Action button to trigger live canvas annotation mode toggle
       appBar: AppBar(
         backgroundColor: const Color(0xff0f766e),
-        foregroundColor: Colors.white,
-        title: Text(widget.lesson.titleEnglish),
+        title: const Text("Qutor Interactive Classroom", style: TextStyle(fontSize: 16)),
         centerTitle: true,
-        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(_isWhiteboardActive ? Icons.edit_off : Icons.border_color, color: Colors.white),
+            onPressed: () => setState(() {
+              _isWhiteboardActive = !_isWhiteboardActive;
+              _points.clear(); // clear lines on mode toggle
+            }),
+          )
+        ],
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // 1. Bismillah
+            // 1. Header Bismillah
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12.0),
+              padding: EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
                 "بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: 'QuranFont', fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
               ),
             ),
 
-            // 2. Dynamic Banner Ribbon (Red & Green Split Like Book Picture)
+            // 2. Adaptive Split Ribbon
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 2),
               child: Row(
                 children: [
                   Expanded(
@@ -288,9 +359,9 @@ class _QaidaDetailScreenState extends State<QaidaDetailScreen> {
                         borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
                       ),
                       child: Text(
-                        widget.lesson.titleArabic,
+                        currentLesson.titleArabic,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'QuranFont'),
+                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -303,9 +374,9 @@ class _QaidaDetailScreenState extends State<QaidaDetailScreen> {
                         borderRadius: BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
                       ),
                       child: Text(
-                        getArabicLessonNumber(widget.lesson.lessonNumber),
+                        getArabicLessonNumber(currentLesson.lessonNumber),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'QuranFont'),
+                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -313,83 +384,132 @@ class _QaidaDetailScreenState extends State<QaidaDetailScreen> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
-            // 3. Main Book Board View (PageView)
+            // 3. Live Integrated Custom Painter Canvas Layer + Book Swiper
             Expanded(
-              child: _pageNumbers.isEmpty
-                  ? const Center(child: Text("Loading Qaida Grid..."))
-                  : PageView.builder(
-                controller: _pageController,
-                itemCount: _pageNumbers.length,
-                reverse: true, // Right to left book swiping
-                onPageChanged: (index) => setState(() => _currentPageIndex = index),
-                itemBuilder: (context, pageIndex) {
-                  int currentPageNumber = _pageNumbers[pageIndex];
-                  List<Map<String, dynamic>> currentPageWords = _pagesMap[currentPageNumber] ?? [];
+              child: Stack(
+                children: [
+                  // Underlying structural book pages view
+                  PageView.builder(
+                    controller: _pageController,
+                    itemCount: _globalPages.length,
+                    reverse: true, // Right to left flipping
+                    onPageChanged: (index) => setState(() {
+                      _currentPageIndex = index;
+                      _points.clear(); // Auto-clean markings when moving pages
+                    }),
+                    itemBuilder: (context, pageIndex) {
+                      final pageData = _globalPages[pageIndex];
 
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Directionality(
-                      textDirection: TextDirection.rtl,
-                      child: GridView.builder(
-                        itemCount: currentPageWords.length,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 5, // 🔥 Qutor/Real Qaida layout structure
-                          crossAxisSpacing: 0,
-                          mainAxisSpacing: 0,
-                          childAspectRatio: 0.85,
-                        ),
-                        itemBuilder: (context, index) {
-                          final item = currentPageWords[index];
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16,),
+                        child: Directionality(
+                          textDirection: TextDirection.rtl,
+                          child: GridView.builder(
+                            itemCount: pageData.words.length,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 5,
+                              childAspectRatio: 0.85,
                             ),
-                            child: InkWell(
-                              onTap: () => _playAudio(item['audio']),
-                              child: Stack(
-                                children: [
-                                  if (item['word_name'] != null)
-                                    Positioned(
-                                      top: 4,
-                                      left: 6,
-                                      child: Text(
-                                        item['word_name'],
-                                        style: const TextStyle(color: Color(0xffdc2626), fontSize: 9, fontFamily: 'QuranFont', fontWeight: FontWeight.w500),
+                            itemBuilder: (context, index) {
+                              final item = pageData.words[index];
+                              return Container(
+                                color: Colors.white,
+                                child: InkWell(
+                                  onTap: _isWhiteboardActive ? null : () => _playAudio(item['audio']),
+                                  child: Stack(
+                                    children: [
+                                      if (item['word_name'] != null)
+                                        Positioned(
+                                          top: 4,
+                                          left: 6,
+                                          child: Text(
+                                            item['word_name'],
+                                            style: const TextStyle(color: Color(0xffdc2626), fontSize: 8, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      Center(
+                                        child: Text(
+                                          item['word_arabic'],
+                                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
+                                        ),
                                       ),
-                                    ),
-                                  Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: Text(
-                                        item['word_arabic'],
-                                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'QuranFont', color: Colors.black),
-                                      ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // Transparent overlay canvas drawing layer for tracing over letters
+                  if (_isWhiteboardActive)
+                    Positioned.fill(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16,),
+                        child: GestureDetector(
+                          onPanUpdate: (details) {
+                            setState(() {
+                              RenderBox renderBox = context.findRenderObject() as RenderBox;
+                              _points.add(renderBox.globalToLocal(details.globalPosition));
+                            });
+                          },
+                          onPanEnd: (details) => _points.add(null),
+                          child: CustomPaint(
+                            painter: OverlayWhiteboardPainter(points: _points, strokeColor: _selectedColor, width: _strokeWidth),
+                            size: Size.infinite,
+                          ),
+                        ),
                       ),
                     ),
-                  );
-                },
+                ],
               ),
             ),
 
-            // 4. Bottom Qutor Navigation Page Controllers
+            // 4. Whiteboard Stroke settings overlay block when board tool is active
+            if (_isWhiteboardActive)
+              Container(
+                color: const Color(0xff2d2d2d),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Text("Width:", style: TextStyle(color: Colors.white, fontSize: 12)),
+                    Expanded(
+                      child: Slider(
+                        value: _strokeWidth,
+                        min: 2.0, max: 20.0,
+                        activeColor: Colors.teal,
+                        onChanged: (v) => setState(() => _strokeWidth = v),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.palette, color: Colors.amber),
+                      onPressed: () => setState(() {
+                        _selectedColor = (_selectedColor == Colors.red) ? Colors.blue : Colors.red;
+                      }),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_sweep, color: Colors.white),
+                      onPressed: () => setState(() => _points.clear()),
+                    ),
+                  ],
+                ),
+              ),
+
+            // 5. Global Navigation Controllers Block
             Padding(
-              padding: const EdgeInsets.only(bottom: 15.0, left: 20, right: 20),
+              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios, color: Color(0xff0f766e), size: 22),
-                    onPressed: _currentPageIndex < _pageNumbers.length - 1
+                    onPressed: _currentPageIndex < _globalPages.length - 1
                         ? () => _pageController.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeInOut)
                         : null,
                   ),
@@ -397,8 +517,8 @@ class _QaidaDetailScreenState extends State<QaidaDetailScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                     decoration: BoxDecoration(color: Colors.grey.shade800, borderRadius: BorderRadius.circular(4)),
                     child: Text(
-                      "${(_currentPageIndex + 1).toString().padLeft(2, '0')} / ${widget.lesson.totalPages.toString().padLeft(2, '0')}",
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1),
+                      "${(_currentPageIndex + 1).toString().padLeft(2, '0')} / ${_globalPages.length.toString().padLeft(2, '0')}",
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                   ),
                   IconButton(
@@ -415,4 +535,31 @@ class _QaidaDetailScreenState extends State<QaidaDetailScreen> {
       ),
     );
   }
+}
+
+// Custom Painter specifically mapped for vector tracking over the Quran Grid layout
+class OverlayWhiteboardPainter extends CustomPainter {
+  final List<Offset?> points;
+  final Color strokeColor;
+  final double width;
+
+  OverlayWhiteboardPainter({required this.points, required this.strokeColor, required this.width});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    Paint paint = Paint()
+      ..color = strokeColor
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = width
+      ..isAntiAlias = true;
+
+    for (int i = 0; i < points.length - 1; i++) {
+      if (points[i] != null && points[i + 1] != null) {
+        canvas.drawLine(points[i]!, points[i + 1]!, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant OverlayWhiteboardPainter oldDelegate) => true;
 }
