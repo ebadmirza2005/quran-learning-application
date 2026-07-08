@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:quran_learning_application/screen/teacher_screen/classroom_demo/classroom_demo.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../utils/button.dart';
 import '../../utils/text.dart';
 import '../auth_screen.dart';
@@ -39,21 +38,18 @@ class _SettingScreenState extends State<SettingScreen> {
 
         if (!mounted) return;
 
-        // 🔥 Agar user database se delete ho chuka hai
         if (data == null) {
           await supabase.auth.signOut();
           if (!mounted) return;
 
-          // Foran login screen par phenko
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) => const AuthScreen()),
-                (route) => false, // Taake user back daba kar dubara andar na aa sake
+                (route) => false,
           );
           return;
         }
 
-        // Agar data mil gaya to state update karo
         setState(() {
           tutorName = data['name'] ?? "No Name Found";
           profileImageUrl = data['profile_image'];
@@ -88,7 +84,6 @@ class _SettingScreenState extends State<SettingScreen> {
               children: [
                 Column(
                   children: [
-                    // --- Profile Image Stack Section ---
                     Stack(
                       alignment: Alignment.center,
                       children: [
