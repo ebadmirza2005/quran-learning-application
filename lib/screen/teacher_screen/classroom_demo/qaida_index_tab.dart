@@ -1,9 +1,6 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
-// =========================================================================
-// 🗂️ 27 PAGES INTERACTIVE NOORANI QAIDA WITH LIVE CANVAS OVERLAY
-// =========================================================================
 class QaidaIndexTab extends StatefulWidget {
   const QaidaIndexTab({super.key});
 
@@ -15,17 +12,14 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final PageController _pageController = PageController();
 
-  // Total 27 Pages Array config
   final int _totalPages = 27;
   int _currentPageIndex = 0;
 
-  // Drawing States (Whiteboard Integration variables)
   final List<Offset?> _points = [];
-  Color _selectedColor = const Color(0xffdc2626); // Default Red Pen
+  Color _selectedColor = const Color(0xffdc2626);
   double _strokeWidth = 6.0;
-  bool _isWhiteboardActive = false; // Toggle tool layer over page image
+  bool _isWhiteboardActive = false;
 
-  // Dynamic Arabic Lesson Headers Mapping for 27 Pages
   String getLessonHeaderArabic(int pageNum) {
     if (pageNum <= 2) return "حُرُوفُ الْهِجَاءِ الْمُفْرَدَةِ (Lesson 1)";
     if (pageNum <= 5) return "حُرُوفُ الْهِجَاءِ الْمُرَكَّبَةِ (Lesson 2)";
@@ -57,12 +51,11 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
         centerTitle: true,
         elevation: 0,
         actions: [
-          // Whiteboard Toggle Button
           IconButton(
             icon: Icon(_isWhiteboardActive ? Icons.edit_off : Icons.border_color, color: Colors.white),
             onPressed: () => setState(() {
               _isWhiteboardActive = !_isWhiteboardActive;
-              _points.clear(); // Clear canvas drawings when switching modes
+              _points.clear();
             }),
           )
         ],
@@ -82,11 +75,9 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
 
             const SizedBox(height: 10),
 
-            // 3. Main Image Container Swiper + Drawing Overlay Layer
             Expanded(
               child: Stack(
                 children: [
-                  // Book Page Image Swiper (Right to Left Navigation)
                   PageView.builder(
                     controller: _pageController,
                     itemCount: _totalPages,
@@ -98,26 +89,30 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
                     itemBuilder: (context, index) {
                       int pageNumber = index + 1;
 
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: const Color(0xff854d0e), width: 1.5),
-                        ),
-                        child: ClipRRect(
-                          child: Image.asset(
-                            'assets/qaida/page_$pageNumber.png', // 🔥 Dynamic local images loading pattern
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              // Fallback UI helper if asset file path is missing during testing
-                              return Center(
-                                child: Text(
-                                  "Qaida Page $pageNumber\n(Place image inside: assets/qaida/page_$pageNumber.png)",
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                                ),
-                              );
-                            },
+                      return Center(
+                        child: Container(
+                          width: MediaQuery.of(context).size.width * 0.55,
+                          height: MediaQuery.of(context).size.height * 0.55,
+                          margin: const EdgeInsets.symmetric(horizontal: 16, ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: const Color(0xff854d0e), width: 1.5),
+                          ),
+                          child: ClipRRect(
+                            child: Image.asset(
+                              'assets/qaida/page_$pageNumber.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                // Fallback UI helper if asset file path is missing during testing
+                                return Center(
+                                  child: Text(
+                                    "Qaida Page $pageNumber\n(Place image inside: assets/qaida/page_$pageNumber.png)",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       );
