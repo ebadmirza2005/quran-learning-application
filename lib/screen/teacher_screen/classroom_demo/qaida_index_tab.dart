@@ -47,7 +47,7 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
       backgroundColor: const Color(0xfffcfdfa),
       appBar: AppBar(
         backgroundColor: const Color(0xff0f766e),
-        title: const Text("Qutor Interactive Qaida Classroom", style: TextStyle(fontSize: 16, color: Colors.white)),
+        title: const Text("Qaida Classroom", style: TextStyle(fontSize: 16, color: Colors.white)),
         centerTitle: true,
         elevation: 0,
         actions: [
