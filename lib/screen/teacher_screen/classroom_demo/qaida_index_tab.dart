@@ -91,8 +91,8 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
 
                       return Center(
                         child: Container(
-                          width: MediaQuery.of(context).size.width * 0.55,
-                          height: MediaQuery.of(context).size.height * 0.55,
+                          width: MediaQuery.of(context).size.width * 0.75,
+                          height: MediaQuery.of(context).size.height * 0.75,
                           margin: const EdgeInsets.symmetric(horizontal: 16, ),
                           decoration: BoxDecoration(
                             color: Colors.white,
