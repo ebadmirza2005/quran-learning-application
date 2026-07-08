@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quran_learning_application/screen/teacher_screen/classroom_demo/classroom_demo.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../utils/button.dart';
@@ -16,8 +17,8 @@ class SettingScreen extends StatefulWidget {
 class _SettingScreenState extends State<SettingScreen> {
   final supabase = Supabase.instance.client;
   String tutorName = "Loading...";
-  String? profileImageUrl; // Image URL store karne ke liye variable
-  bool isLoadingImage = true; // Image loading state track karne ke liye
+  String? profileImageUrl;
+  bool isLoadingImage = true;
 
   @override
   void initState() {
@@ -30,7 +31,6 @@ class _SettingScreenState extends State<SettingScreen> {
       final user = supabase.auth.currentUser;
 
       if (user != null) {
-        // Yahan 'name' ke sath 'profile_image' column ko bhi select kiya hai
         final data = await supabase
             .from('tutors')
             .select('name, profile_image')
@@ -39,13 +39,24 @@ class _SettingScreenState extends State<SettingScreen> {
 
         if (!mounted) return;
 
+        // 🔥 Agar user database se delete ho chuka hai
+        if (data == null) {
+          await supabase.auth.signOut();
+          if (!mounted) return;
+
+          // Foran login screen par phenko
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const AuthScreen()),
+                (route) => false, // Taake user back daba kar dubara andar na aa sake
+          );
+          return;
+        }
+
+        // Agar data mil gaya to state update karo
         setState(() {
-          if (data != null) {
-            tutorName = data['name'] ?? "No Name Found";
-            profileImageUrl = data['profile_image']; // URL state mein save kiya
-          } else {
-            tutorName = "Profile Not Found";
-          }
+          tutorName = data['name'] ?? "No Name Found";
+          profileImageUrl = data['profile_image'];
         });
       }
     } catch (e) {
@@ -84,11 +95,9 @@ class _SettingScreenState extends State<SettingScreen> {
                         CircleAvatar(
                           radius: 40,
                           backgroundColor: const Color(0xff0f766e),
-                          // Agar URL maujood ho to NetworkImage show karega, warna null
                           backgroundImage: (profileImageUrl != null && profileImageUrl!.isNotEmpty)
                               ? NetworkImage(profileImageUrl!)
                               : null,
-                          // Agar image loading mein ho ya URL na ho to default widget dikhayega
                           child: (profileImageUrl == null || profileImageUrl!.isEmpty)
                               ? const Icon(
                             Icons.person,
@@ -97,7 +106,6 @@ class _SettingScreenState extends State<SettingScreen> {
                           )
                               : null,
                         ),
-                        // Loading spinner agar network image fetch ho rahi ho
                         if (isLoadingImage)
                           const Positioned.fill(
                             child: CircularProgressIndicator(
@@ -148,10 +156,12 @@ class _SettingScreenState extends State<SettingScreen> {
                       ],
                     ),
                     const SizedBox(height: 10,),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.laptop, color: Color(0xff0f766e),),
-                        TextButtonWidget(buttonText: "Classroom Demo",)
+                        const Icon(Icons.laptop, color: Color(0xff0f766e),),
+                        TextButtonWidget(buttonText: "Classroom Demo", onTap: () {
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ClassroomDemo()));
+                        },)
                       ],
                     ),
                     const SizedBox(height: 10,),
@@ -174,9 +184,10 @@ class _SettingScreenState extends State<SettingScreen> {
                         try {
                           await supabase.auth.signOut();
                           if (!context.mounted) return;
-                          Navigator.pushReplacement(
+                          Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(builder: (_) => const AuthScreen()),
+                                (route) => false,
                           );
                         } catch (e) {
                           print("Logout Error: $e");

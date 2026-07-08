@@ -6,7 +6,6 @@ import '../utils/button.dart';
 import '../utils/text.dart';
 import 'signup_auth_screen.dart';
 import 'signup_tutor_screen.dart';
-import 'teacher_screen/home_screen.dart';
 import 'tutor_home_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -25,7 +24,6 @@ class _AuthScreenState extends State<AuthScreen> {
   bool isLoading = false;
 
   Future<void> login() async {
-
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -41,6 +39,29 @@ class _AuthScreenState extends State<AuthScreen> {
       if (!mounted) return;
 
       if (result.user != null && result.session != null) {
+        final tutorData = await supabase
+            .from('tutors')
+            .select('id')
+            .eq('id', result.user!.id)
+            .maybeSingle();
+
+        if (!mounted) return;
+
+        if (tutorData == null) {
+          await supabase.auth.signOut();
+
+          setState(() {
+            isLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Your account doesn't exist"),
+                backgroundColor: Colors.red,
+              )
+          );
+          return;
+        }
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
@@ -50,7 +71,7 @@ class _AuthScreenState extends State<AuthScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text("Invalid Email or Password"),
               backgroundColor: Colors.red,
             )

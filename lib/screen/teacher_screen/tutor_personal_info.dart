@@ -110,7 +110,9 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
 
       if (_imageFile != null) {
         final fileExtension = _imageFile!.path.split('.').last;
-        final path = '${user.id}/profile.$fileExtension';
+        
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final path = '${user.id}/profile_$timestamp.$fileExtension';
 
         await Supabase.instance.client.storage
             .from('avatars')
@@ -135,7 +137,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
         'name': _nameController.text,
         'email': _emailController.text,
         'phone': _phoneController.text,
-        'dob': _dobController.text,
+        'dob': _dobController.text.isEmpty ? null : _dobController.text,
         'languages': _selectedLanguages,
         'skills': selectedSkills,
         'profile_image': finalImageUrl,

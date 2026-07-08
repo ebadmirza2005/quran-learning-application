@@ -97,7 +97,8 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
         );
       }
     } catch (e) {
-      _showSnackBar("Error: ${e.toString()}");
+      // _showSnackBar("Error: ${e.toString()}");
+      _showSnackBar("User Already Registered!");
     } finally {
       if (mounted) {
         setState(() {

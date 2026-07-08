@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:bottom_navy_bar/bottom_navy_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_zoom_drawer/flutter_zoom_drawer.dart'; // Naya import
+import 'package:flutter_zoom_drawer/flutter_zoom_drawer.dart';
 import 'package:quran_learning_application/screen/teacher_screen/home_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'auth_screen.dart';
 import 'teacher_screen/message_screen.dart';
-import 'teacher_screen/setting_screen.dart'; // Ye ab aap ka drawer content banega
+import 'teacher_screen/setting_screen.dart';
 import 'teacher_screen/students_screen.dart';
 
 class TutorHomeScreen extends StatefulWidget {
@@ -17,6 +21,54 @@ class TutorHomeScreen extends StatefulWidget {
 class _TutorHomeScreenState extends State<TutorHomeScreen> {
   final _drawerController = ZoomDrawerController();
   int index = 0;
+  final supabase = Supabase.instance.client;
+  StreamSubscription? _deleteListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _startDeleteListener();
+  }
+
+  void _startDeleteListener() {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _deleteListener = supabase
+        .from('tutors')
+        .stream(primaryKey: ['id'])
+        .listen((List<Map<String, dynamic>> allTutors) async {
+
+      final userExists = allTutors.any((tutor) => tutor['id'] == user.id);
+
+      if (!userExists) {
+        _deleteListener?.cancel();
+        await supabase.auth.signOut();
+
+        if (!mounted) return;
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const AuthScreen()),
+              (route) => false,
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.red,
+            content: Text("Your account has been deleted or disabled!"),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _deleteListener?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
