@@ -164,25 +164,25 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: "Don't have an account?",
-                      style: TextStyle(color: Colors.black54),
-                    ),
-                    const WidgetSpan(child: SizedBox(width: 5)),
-                    TextSpan(
-                      text: "Signup",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xff0f766e),
-                      ),
-                      recognizer: _tapGestureRecognizer,
-                    ),
-                  ],
-                ),
-              ),
+              // RichText(
+              //   text: TextSpan(
+              //     children: [
+              //       const TextSpan(
+              //         text: "Don't have an account?",
+              //         style: TextStyle(color: Colors.black54),
+              //       ),
+              //       const WidgetSpan(child: SizedBox(width: 5)),
+              //       TextSpan(
+              //         text: "Signup",
+              //         style: const TextStyle(
+              //           fontWeight: FontWeight.bold,
+              //           color: Color(0xff0f766e),
+              //         ),
+              //         recognizer: _tapGestureRecognizer,
+              //       ),
+              //     ],
+              //   ),
+              // ),
               const SizedBox(height: 20),
               const TextWidget(
                 text: "OR",
