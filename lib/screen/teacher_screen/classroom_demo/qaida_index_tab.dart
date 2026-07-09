@@ -17,6 +17,7 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
 
   final List<Offset?> _points = [];
   Color _selectedColor = const Color(0xffdc2626);
+
   double _strokeWidth = 6.0;
   bool _isWhiteboardActive = false;
 
@@ -69,10 +70,10 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: _totalPages,
-                reverse: true, // Book Style Flip
+                reverse: true,
                 onPageChanged: (index) => setState(() {
                   _currentPageIndex = index;
-                  _points.clear(); // New page clears the board lines automatically
+                  _points.clear();
                 }),
                 itemBuilder: (context, index) {
                   int pageNumber = index + 1;
@@ -82,10 +83,8 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
                       width: MediaQuery.of(context).size.width * 0.75,
                       height: MediaQuery.of(context).size.height * 0.75,
                       margin: const EdgeInsets.symmetric(horizontal: 16),
-                      // 🔥 Image aur Whiteboard ko aik hi container ke Stack mein daal diya taake boundary match ho
                       child: Stack(
                         children: [
-                          // 1. Underlying Qaida Image
                           Positioned.fill(
                             child: ClipRRect(
                               child: Image.asset(
@@ -103,14 +102,11 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
                               ),
                             ),
                           ),
-
-                          // 2. Interactive Whiteboard Layer (Sirf image container ke size ka hoga)
                           if (_isWhiteboardActive)
                             Positioned.fill(
                               child: GestureDetector(
                                 onPanStart: (details) {
                                   setState(() {
-                                    // 🔥 localPosition use karne se touch offset bilkul zero ho jata hai
                                     _points.add(details.localPosition);
                                   });
                                 },
@@ -137,8 +133,6 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
                 },
               ),
             ),
-
-            // 4. Custom Sliders Control Panel
             if (_isWhiteboardActive)
               Container(
                 color: const Color(0xff2d2d2d),
@@ -174,8 +168,7 @@ class _QaidaIndexTabState extends State<QaidaIndexTab> {
                 ),
               ),
 
-            // 5. Global Book Page Navigation Controllers Block
-            Padding(
+               Padding(
               padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../../tutor_home_screen.dart';
 import 'qaida_index_tab.dart'; // 🔥 Is file ke andar ab QaidaIndexTab aur QaidaDetailScreen dono maujood hain
 import 'quran_index_tab.dart';
 import 'whiteboard_tab.dart';
@@ -37,7 +40,10 @@ class _ClassroomDemoState extends State<ClassroomDemo> with SingleTickerProvider
         title: const Text("Classroom Demo"),
         centerTitle: true,
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.exit_to_app)),
+          IconButton(onPressed: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
+
+          }, icon: const Icon(Icons.exit_to_app)),
         ],
         bottom: TabBar(
           controller: tabController,
