@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:quran_learning_application/utils/text.dart';
 import '../../tutor_home_screen.dart';
-import 'qaida_index_tab.dart'; // 🔥 Is file ke andar ab QaidaIndexTab aur QaidaDetailScreen dono maujood hain
+import 'qaida_index_tab.dart';
 import 'quran_index_tab.dart';
 import 'whiteboard_tab.dart';
 
@@ -35,6 +36,84 @@ class _ClassroomDemoState extends State<ClassroomDemo> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading:  PopupMenuButton<String>(
+          color: Colors.white,
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+          onSelected: (value) {
+            if (value == "") {
+
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem<String>(
+              value: "screen-sharing",
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                decoration: BoxDecoration(
+                  color: Color(0xff0f766e)
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.screen_share),
+                      SizedBox(width: 10,),
+                      Text(
+                        "Start Screen Sharing",
+                        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.white, ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            PopupMenuItem(
+              value: "students-control",
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                decoration: BoxDecoration(
+                    color: Color(0xff0f766e)
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.control_camera),
+                      SizedBox(width: 10,),
+                      Text(
+                        "Enable Students Control",
+                        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.white, ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            PopupMenuItem(
+              value: "camera",
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                decoration: BoxDecoration(
+                    color: Color(0xff0f766e)
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.camera),
+                      SizedBox(width: 10,),
+                      Text(
+                        "Camera",
+                        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.white, ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          ],
+        ),
         backgroundColor: const Color(0xff0f766e),
         foregroundColor: Colors.white,
         title: const Text("Classroom Demo"),
