@@ -6,6 +6,7 @@ import '../utils/gesture_detector_widget.dart';
 import '../utils/text.dart';
 import 'signup_student_screen.dart';
 import 'signup_tutor_screen.dart';
+import 'student_home_screen.dart';
 import 'tutor_home_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -31,40 +32,60 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       final result = await supabase.auth.signInWithPassword(
-        email: _emailController.text.trim(),
+        email: _emailController.text.trim().toLowerCase(),
         password: _passwordController.text,
       );
 
       if (!mounted) return;
 
       if (result.user != null && result.session != null) {
+        final userId = result.user!.id;
+
         final tutorData = await supabase
             .from('tutors')
             .select('id')
-            .eq('id', result.user!.id)
+            .eq('id', userId)
             .maybeSingle();
 
         if (!mounted) return;
 
-        if (tutorData == null) {
-          await supabase.auth.signOut();
-
-          setState(() {
-            isLoading = false;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Your account doesn't exist"),
-              backgroundColor: Colors.red,
-            ),
+        if (tutorData != null) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
+                (Route route) => false,
           );
           return;
         }
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
-          (Route route) => false,
+
+        final studentData = await supabase
+            .from('students')
+            .select('id')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (!mounted) return;
+
+        if (studentData != null) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const StudentHomeScreen()),
+                (Route route) => false,
+          );
+          return;
+        }
+
+        await supabase.auth.signOut();
+
+        setState(() {
+          isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Account role not found or record missing."),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
@@ -181,7 +202,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         TextSpan(
                           text: "Signup",
                           style: const TextStyle(
-                            color: Colors.black,
+                            color: Colors.black54
                           ),
                         ),
                       ],

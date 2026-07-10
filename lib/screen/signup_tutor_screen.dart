@@ -44,7 +44,7 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
 
   Future<void> _signUpTutor() async {
     if (!_isAgree) {
-      _showSnackBar('Please agree to the terms of use');
+      _showSnackBar('Please agree to the terms of use.');
       return;
     }
     if (_passwordController.text != _confirmPasswordController.text) {
@@ -182,6 +182,11 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xffd2dad2),
+      appBar: AppBar(
+        title: const Text("Tutor Sign Up"),
+        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xff0f766e),
+      ),
       body: Center(
         child: SingleChildScrollView(
           child: Column(
@@ -385,14 +390,29 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
-                  : ElevatedButtonWidget(
-                buttonText: "Sign Up",
-                onTap: _signUpTutor,
-                buttonColor: const Color(0xff0f766e),
-                textColor: Colors.white,
+              SizedBox(
+                width: MediaQuery.of(context).size.width * 0.85,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xff0f766e),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: _signUpTutor,
+                  child: _isLoading
+                      ? CircularProgressIndicator(
+                    color: Color(0xff0f766e),
+                  )
+                      : Text(
+                    "Sign Up",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 30),
             ],
