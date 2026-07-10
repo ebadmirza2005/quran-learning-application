@@ -5,14 +5,14 @@ import '../utils/button.dart';
 import '../utils/text.dart';
 import 'tutor_home_screen.dart';
 
-class SignupAuthScreen extends StatefulWidget {
-  const SignupAuthScreen({super.key});
+class SignupStudentScreen extends StatefulWidget {
+  const SignupStudentScreen({super.key});
 
   @override
-  State<SignupAuthScreen> createState() => _SignupAuthScreenState();
+  State<SignupStudentScreen> createState() => _SignupAuthScreenState();
 }
 
-class _SignupAuthScreenState extends State<SignupAuthScreen> {
+class _SignupAuthScreenState extends State<SignupStudentScreen> {
   bool _isAgree = false;
   @override
   Widget build(BuildContext context) {
