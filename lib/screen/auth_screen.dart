@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/auth_field.dart';
 import '../utils/button.dart';
 import '../utils/text.dart';
-import 'signup_auth_screen.dart';
+import 'signup_student_screen.dart';
 import 'signup_tutor_screen.dart';
 import 'tutor_home_screen.dart';
 
@@ -93,7 +93,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _tapGestureRecognizer.onTap = () {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const SignupAuthScreen()),
+        MaterialPageRoute(builder: (_) => const SignupStudentScreen()),
       );
     };
   }
