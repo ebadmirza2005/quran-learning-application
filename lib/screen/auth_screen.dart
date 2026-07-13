@@ -159,19 +159,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     TextButtonWidget(buttonText: "Forgot Password?"),
                     const SizedBox(height: 10),
-                    SizedBox(
-                        width: MediaQuery.of(context).size.width * 0.8,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: login, child: isLoading
-                            ? CircularProgressIndicator(
-                          color: Color(0xff0f766e),
-                        ) : Text("Login", style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xff0f766e)
-                        ),
-                        )
-                        ))
+                    ElevatedButtonWidget(buttonText: "Login", textWeight: FontWeight.bold, textColor: Color(0xff0f766e), onTap: login, isLoading: isLoading,)
                   ],
                 ),
               ),
