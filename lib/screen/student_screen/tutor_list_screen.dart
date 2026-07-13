@@ -34,6 +34,29 @@ class _TutorListScreenState extends State<TutorListScreen> {
     return rawData.toString();
   }
 
+  Widget _buildDataRow(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: TextWidget(text: label, textColor: Colors.white, textWeight: FontWeight.bold,),
+          ),
+          Expanded(
+            flex: 6,
+            child: TextWidget(
+              text: value,
+              textColor: valueColor ?? Colors.white,
+              textWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,7 +90,8 @@ class _TutorListScreenState extends State<TutorListScreen> {
                 );
               }
               return ListView.builder(
-                  padding: const EdgeInsets.all(12),
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.only(left: 12, right: 12, top: 20, bottom: 12),
                   itemCount: tutors.length,
                   itemBuilder: (context, index) {
                     final tutor = tutors[index];
@@ -82,11 +106,10 @@ class _TutorListScreenState extends State<TutorListScreen> {
                     String skillsDisplay = makeDataSafe(tutor['skills']);
                     String rates = makeDataSafe(tutor['rates']);
 
-                    // Supabase se casted boolean online status le rahe hain
                     bool isOnline = tutor['is_online'] as bool? ?? false;
 
                     return Padding(
-                      padding: const EdgeInsets.only(top: 30.0, bottom: 12.0),
+                      padding: const EdgeInsets.only(top: 35.0, bottom: 12.0),
                       child: Stack(
                         clipBehavior: Clip.none,
                         alignment: Alignment.topCenter,
@@ -99,72 +122,54 @@ class _TutorListScreenState extends State<TutorListScreen> {
                             ),
                             elevation: 2,
                             child: SizedBox(
-                              height: 245.0,
                               width: double.infinity,
                               child: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  const SizedBox(height: 35,),
-                                  Text(
-                                    tutorName,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  const SizedBox(height: 35),
+
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                                    child: Text(
+                                      tutorName,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text("$location, $country", style: const TextStyle(color: Colors.black45, fontSize: 12)),
-                                  const SizedBox(height: 15,),
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        flex: 4,
-                                        child: Container(
-                                          height: 150,
-                                          color: const Color(0xff0f766e),
-                                          padding: const EdgeInsets.all(12.0),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                            children: const <Widget>[
-                                              TextWidget(text: "Gender", textColor: Colors.white,),
-                                              TextWidget(text: "Languages", textColor: Colors.white,),
-                                              TextWidget(text: "Expertise", textColor: Colors.white,),
-                                              TextWidget(text: "Rates", textColor: Colors.white,),
-                                              TextWidget(text: "Online", textColor: Colors.white,),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 6,
-                                        child: Container(
-                                          height: 150,
-                                          color: const Color(0xff0f766e),
-                                          padding: const EdgeInsets.all(12.0),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                            children: <Widget>[
-                                              TextWidget(text: gender, textColor: Colors.white),
-                                              TextWidget(text: languages, textColor: Colors.white),
-                                              TextWidget(text: skillsDisplay, textColor: Colors.white),
-                                              TextWidget(text: rates, textColor: Colors.white),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                                    child: Text(
+                                        "$location, $country",
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(color: Colors.black45, fontSize: 12)
+                                    ),
+                                  ),
+                                  const SizedBox(height: 15),
 
-                                              // Online hone par text "Yes" (Green color) aur offline par "No" (Halka white)
-                                              TextWidget(
-                                                text: isOnline ? "Yes" : "No",
-                                                textColor: isOnline ? Colors.greenAccent : Colors.white60,
-                                              ),
-                                            ],
-                                          ),
+                                  Container(
+                                    color: const Color(0xff0f766e),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+                                    child: Column(
+                                      children: [
+                                        _buildDataRow("Gender", gender,),
+                                        _buildDataRow("Languages", languages),
+                                        _buildDataRow("Expertise", skillsDisplay),
+                                        _buildDataRow("Rates", rates),
+                                        _buildDataRow(
+                                          "Online",
+                                          isOnline ? "Yes" : "No",
+                                          valueColor: isOnline ? Colors.greenAccent : Colors.white60,
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
 
+                          // --- FLOATING PROFILE AVATAR ---
                           Positioned(
                             top: -30,
                             child: CircleAvatar(
@@ -203,6 +208,21 @@ class _TutorListScreenState extends State<TutorListScreen> {
                               ),
                             ),
                           ),
+
+                          Positioned(
+                            right: -10,
+                            top: -15,
+                            child: Container(
+                                decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Colors.black
+                                    ),
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                ),
+                                child: IconButton(onPressed: () {
+                                }, icon: Icon(Icons.message, color: Color(0xff0f766e),))),
+                          )
                         ],
                       ),
                     );
