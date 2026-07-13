@@ -79,7 +79,7 @@ class _SignupAuthScreenState extends State<SignupStudentScreen> {
       final user = authResponse.user;
 
       if (user != null) {
-        List<String> selectedSkills = tutorSkills.entries
+        List<String> seekingKnowledge = tutorSkills.entries
             .where((entry) => entry.value == true)
             .map((entry) => entry.key)
             .toList();
@@ -97,7 +97,7 @@ class _SignupAuthScreenState extends State<SignupStudentScreen> {
           'country': _selectedCountry,
           'city': _cityController.text.trim(),
           'timezone': _selectedTimeZone,
-          'skills': selectedSkills,
+          'seeking_knowledge': seekingKnowledge,
           'created_at': DateTime.now().toIso8601String(),
         });
 

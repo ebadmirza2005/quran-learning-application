@@ -9,7 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_screen.dart';
 import 'teacher_screen/message_screen.dart';
 import 'teacher_screen/setting_screen.dart';
-import 'teacher_screen/students_screen.dart';
+import 'teacher_screen/students_list_screen.dart';
 
 class TutorHomeScreen extends StatefulWidget {
   const TutorHomeScreen({super.key});
