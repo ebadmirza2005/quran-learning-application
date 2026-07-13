@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/auth_field.dart';
 import '../utils/button.dart';
+import '../utils/gesture_detector_widget.dart';
 import '../utils/text.dart';
 import 'signup_student_screen.dart';
 import 'signup_tutor_screen.dart';
@@ -163,26 +164,6 @@ class _AuthScreenState extends State<AuthScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
-              // RichText(
-              //   text: TextSpan(
-              //     children: [
-              //       const TextSpan(
-              //         text: "Don't have an account?",
-              //         style: TextStyle(color: Colors.black54),
-              //       ),
-              //       const WidgetSpan(child: SizedBox(width: 5)),
-              //       TextSpan(
-              //         text: "Signup",
-              //         style: const TextStyle(
-              //           fontWeight: FontWeight.bold,
-              //           color: Color(0xff0f766e),
-              //         ),
-              //         recognizer: _tapGestureRecognizer,
-              //       ),
-              //     ],
-              //   ),
-              // ),
               const SizedBox(height: 20),
               const TextWidget(
                 text: "OR",
@@ -191,18 +172,50 @@ class _AuthScreenState extends State<AuthScreen> {
                 textWeight: FontWeight.bold,
               ),
               const SizedBox(height: 20),
-              ElevatedButtonWidget(
-                buttonText: "Sign up as Tutors",
-                buttonColor: const Color(0xff0f766e),
-                textColor: Colors.white,
-                textWeight: FontWeight.bold,
-                onTap: () {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SignupTutorScreen())
-                  );
-                },
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextWidget(text: "Don't have an account?", ),
+                  SizedBox(width: 5),
+                  TextWidget(text: "Signup",)
+                ],
               ),
+              SizedBox(height: 20,),
+              TextWidget(text: "AS", textSize: 20.0, textColor: Color(0xff0f766e), textWeight: FontWeight.bold,),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GestureDetectorWidget(text: "Tutor", onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SignupTutorScreen()));
+                  }),
+                  SizedBox(width: 10),
+                  TextWidget(text: "/", textSize: 50, textWeight: FontWeight.bold,),
+                  SizedBox(width: 10),
+                  GestureDetectorWidget(
+                    text: "Student",
+                    onTap: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SignupStudentScreen())
+                      );
+                    },
+                  )
+                ],
+              ),
+
+              // ElevatedButtonWidget(
+              //   buttonText: "Sign up as Tutors",
+              //   buttonColor: const Color(0xff0f766e),
+              //   textColor: Colors.white,
+              //   textWeight: FontWeight.bold,
+              //   onTap: () {
+              //     Navigator.push(
+              //         context,
+              //         MaterialPageRoute(builder: (_) => const SignupTutorScreen())
+              //     );
+              //   },
+              // ),
             ],
           ),
         ),
