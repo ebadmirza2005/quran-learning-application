@@ -192,7 +192,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButtonWidget(
-                buttonText: "Sign up as Tutor",
+                buttonText: "Sign up as Tutors",
                 buttonColor: const Color(0xff0f766e),
                 textColor: Colors.white,
                 textWeight: FontWeight.bold,
