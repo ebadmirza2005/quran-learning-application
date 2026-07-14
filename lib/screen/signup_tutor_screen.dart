@@ -402,7 +402,7 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                   onPressed: _signUpTutor,
                   child: _isLoading
                       ? CircularProgressIndicator(
-                    color: Color(0xff0f766e),
+                    color: Colors.white
                   )
                       : Text(
                     "Sign Up",
