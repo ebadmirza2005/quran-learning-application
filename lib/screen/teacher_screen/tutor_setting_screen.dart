@@ -135,7 +135,7 @@ class _SettingScreenState extends State<SettingScreen> {
                       children: [
                         const Icon(Icons.edit_square, color: Color(0xff0f766e),),
                         TextButtonWidget(buttonText: "Edit Info", onTap: () {
-                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorEditInfo()));
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TutorEditInfo()));
                         },)
                       ],
                     ),
