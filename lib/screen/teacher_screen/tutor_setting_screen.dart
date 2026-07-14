@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
 import '../auth_screen.dart';
+import 'tutor_edit_info.dart';
 import 'tutor_personal_info.dart';
 
 class SettingScreen extends StatefulWidget {
@@ -130,10 +131,12 @@ class _SettingScreenState extends State<SettingScreen> {
                       ],
                     ),
                     const SizedBox(height: 10,),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.edit_square, color: Color(0xff0f766e),),
-                        TextButtonWidget(buttonText: "Edit Info",)
+                        const Icon(Icons.edit_square, color: Color(0xff0f766e),),
+                        TextButtonWidget(buttonText: "Edit Info", onTap: () {
+                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorEditInfo()));
+                        },)
                       ],
                     ),
                     const SizedBox(height: 10,),
