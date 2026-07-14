@@ -23,7 +23,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   StreamSubscription? _deleteListener;
   late final String _currentUserId;
 
-  // 🌟 Un unique senders (tutors) ki IDs save karne ke liye jinki unread chats user dekh chuka hai
   final Set<String> _clearedSenderIds = {};
 
   @override
@@ -131,28 +130,22 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           inactiveColor: inactiveColor,
         ),
 
-        // 🌟 FIXED REALTIME UNIQUE SENDER BADGE FOR STUDENTS:
         BottomNavyBarItem(
           icon: StreamBuilder<List<Map<String, dynamic>>>(
             stream: supabase.from('messages').stream(primaryKey: ['id']),
             builder: (context, snapshot) {
               final allMessages = snapshot.data ?? [];
 
-              // 1. Apne liye aane wale unread messages filter kar rahe hain
               final unreadMessages = allMessages.where((msg) {
                 return msg['receiver_id'] == _currentUserId && msg['is_read'] == false;
               }).toList();
 
-              // 2. Unread tutors ki unique IDs ka Set nikalenge
               final currentUnreadSenders = unreadMessages.map((msg) => msg['sender_id'] as String).toSet();
 
-              // 🌟 Auto-clear logic on view:
-              // Agar student Messages screen (index 2) par hai, to current unread log cleared set mein chale jayein
               if (index == 2) {
                 _clearedSenderIds.addAll(currentUnreadSenders);
               }
 
-              // 3. Diff nikalenge taake sirf wahi dikhein jo abhi tak clear nahi kiye gaye
               final activeAlertSenders = currentUnreadSenders.difference(_clearedSenderIds);
               final int peopleCount = activeAlertSenders.length;
 
@@ -163,7 +156,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                   alignment: Alignment.center,
                   children: [
                     const Icon(Icons.message),
-                    // Badge condition with index check so it doesn't clip or show inside the screen itself
                     if (peopleCount > 0 && index != 2)
                       Positioned(
                         right: -8,
