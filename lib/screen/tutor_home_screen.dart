@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:bottom_navy_bar/bottom_navy_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_zoom_drawer/flutter_zoom_drawer.dart';
-import 'package:quran_learning_application/screen/teacher_screen/home_screen.dart';
+import 'package:quran_learning_application/screen/teacher_screen/tutor_home_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_screen.dart';
 import 'teacher_screen/tutor_message_screen.dart';
-import 'teacher_screen/setting_screen.dart';
+import 'teacher_screen/tutor_setting_screen.dart';
 import 'teacher_screen/students_list_screen.dart';
 
 class TutorHomeScreen extends StatefulWidget {
@@ -23,10 +23,15 @@ class _TutorHomeScreenState extends State<TutorHomeScreen> {
   int index = 0;
   final supabase = Supabase.instance.client;
   StreamSubscription? _deleteListener;
+  late final String _currentUserId;
+
+  // 🌟 Acknowledged message check ke liye precise state control
+  DateTime? _lastClearedMessageTime;
 
   @override
   void initState() {
     super.initState();
+    _currentUserId = supabase.auth.currentUser?.id ?? '';
     _startDeleteListener();
   }
 
@@ -110,7 +115,14 @@ class _TutorHomeScreenState extends State<TutorHomeScreen> {
         if (newIndex == 3) {
           _drawerController.toggle?.call();
         } else {
-          setState(() => index = newIndex);
+          setState(() {
+            index = newIndex;
+            // 🌟 JAB USER MESSAGES TAB PAR TAP KARE:
+            // Hum notification timeline clear mark kar dete hain tab tak jab tak koi actual new row na aye
+            if (index == 2) {
+              _lastClearedMessageTime = DateTime.now().toUtc();
+            }
+          });
         }
       },
       items: <BottomNavyBarItem>[
@@ -126,12 +138,71 @@ class _TutorHomeScreenState extends State<TutorHomeScreen> {
           activeColor: const Color(0xff0f766e),
           inactiveColor: inactiveColor,
         ),
+
+        // 🌟 FIXED REALTIME UNIQUE PEOPLE COUNTER BADGE WITH RESET LOGIC:
         BottomNavyBarItem(
-          icon: const Icon(Icons.message),
+          icon: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: supabase.from('messages').stream(primaryKey: ['id']),
+            builder: (context, snapshot) {
+              final allMessages = snapshot.data ?? [];
+
+              // 1. Filter out only unread messages meant for the logged-in user
+              final unreadMessages = allMessages.where((msg) {
+                final isMyUnread = msg['receiver_id'] == _currentUserId && msg['is_read'] == false;
+                if (!isMyUnread) return false;
+
+                // 🌟 TIMELINE CHECK:
+                // Agar tab click ho chuka hai, to sirf clear timestamp ke BAAD wale naye messages count honge
+                if (_lastClearedMessageTime != null) {
+                  final msgCreatedAt = DateTime.tryParse(msg['created_at'] ?? '')?.toUtc() ?? DateTime.now().toUtc();
+                  return msgCreatedAt.isAfter(_lastClearedMessageTime!);
+                }
+
+                return true;
+              }).toList();
+
+              // 2. Senders ki unique IDs ka Set nikalenge taake sirf logo ka count aaye (messages ka nahi)
+              final uniqueSenders = unreadMessages.map((msg) => msg['sender_id'] as String).toSet();
+              final int peopleCount = uniqueSenders.length;
+
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.message),
+                  if (peopleCount > 0 && index != 2)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          "$peopleCount",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           title: const Center(child: Text('Messages')),
           activeColor: const Color(0xff0f766e),
           inactiveColor: inactiveColor,
         ),
+
         BottomNavyBarItem(
           icon: const Icon(Icons.settings),
           title: const Center(child: Text('Settings')),

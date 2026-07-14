@@ -20,22 +20,56 @@ class _MessageScreenState extends State<MessageScreen> {
     _currentUserId = _supabase.auth.currentUser!.id;
   }
 
+  // 🌟 Supabase se dono tables (tutors aur students) ke saare valid/existing users ki IDs lekar aate hain
+  Future<Set<String>> _getValidUserIds() async {
+    try {
+      final tutors = await _supabase.from('tutors').select('id');
+      final students = await _supabase.from('students').select('id');
+
+      final Set<String> validIds = {};
+      for (var t in tutors) {
+        validIds.add(t['id'].toString());
+      }
+      for (var s in students) {
+        validIds.add(s['id'].toString());
+      }
+      return validIds;
+    } catch (e) {
+      return {};
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        backgroundColor: const Color(0xffd2dad2), // App standard background
-        appBar: AppBar(
-          backgroundColor: const Color(0xff0f766e),
-          foregroundColor: Colors.white,
-          title: const Text("Messages"),
-          centerTitle: true,
-        ),
-        body: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _supabase.from('messages').stream(primaryKey: ['id']).order('created_at', ascending: false),
+      backgroundColor: const Color(0xffd2dad2),
+      appBar: AppBar(
+        backgroundColor: const Color(0xff0f766e),
+        foregroundColor: Colors.white,
+        title: const Text("Messages"),
+        centerTitle: true,
+      ),
+      // 🌟 FutureBuilder se pehle valid (jo deleted nahi hain) users ki list mangwa rahe hain
+      body: FutureBuilder<Set<String>>(
+        future: _getValidUserIds(),
+        builder: (context, validUsersSnapshot) {
+          if (validUsersSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xff0f766e)),
+            );
+          }
+
+          final validUserIds = validUsersSnapshot.data ?? {};
+
+          return StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _supabase
+                .from('messages')
+                .stream(primaryKey: ['id'])
+                .order('created_at', ascending: false),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
-                  child: CircularProgressIndicator(color: Color(0xff0f766e),),
+                  child: CircularProgressIndicator(color: Color(0xff0f766e)),
                 );
               }
 
@@ -46,104 +80,122 @@ class _MessageScreenState extends State<MessageScreen> {
               }
 
               final allMessages = snapshot.data ?? [];
+
+              // 🌟 Filter 1: Woh messages jo is user ke hain
               final myMessages = allMessages.where((msg) {
                 return msg['sender_id'] == _currentUserId || msg['receiver_id'] == _currentUserId;
               }).toList();
-
-              if (myMessages.isEmpty) {
-                return const Center(
-                  child: Text("No Conversation Found!", style: TextStyle(color: Colors.black54),),
-                );
-              }
 
               final List<String> chatPartnerIds = [];
               final List<Map<String, dynamic>> distinctRecentChats = [];
 
               for (var msg in myMessages) {
-                final String partnerId = msg['sender_id'] == _currentUserId ? msg['receiver_id'] : msg['sender_id'];
+                final String partnerId = msg['sender_id'] == _currentUserId
+                    ? msg['receiver_id']
+                    : msg['sender_id'];
 
-                if (!chatPartnerIds.contains(partnerId)) {
-                  chatPartnerIds.add(partnerId);
-                  distinctRecentChats.add({
-                    'partner_id': partnerId,
-                    'last_message': msg['message_text'],
-                    'time': msg['created_at'],
-                  });
+                // 🌟 Filter 2: Sirf un users ko add karein jo delete nahi hue (validUserIds ke andar hain)
+                if (validUserIds.contains(partnerId)) {
+                  if (!chatPartnerIds.contains(partnerId)) {
+                    chatPartnerIds.add(partnerId);
+                    distinctRecentChats.add({
+                      'partner_id': partnerId,
+                      'last_message': msg['message_text'],
+                      'time': msg['created_at'],
+                    });
+                  }
                 }
               }
 
+              // 🌟 Agar filter karne ke baad koi valid conversation nahi bachi (ya saare partners delete ho chuke hain)
+              if (distinctRecentChats.isEmpty) {
+                return const Center(
+                  child: Text(
+                    "No Conversation Found!",
+                    style: TextStyle(color: Colors.black54, fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                );
+              }
+
               return ListView.builder(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  itemCount: distinctRecentChats.length,
-                  itemBuilder: (context, index) {
-                    final chat = distinctRecentChats[index];
-                    final partnerId = chat['partner_id'];
-                    final lastMessage = chat['last_message'];
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                itemCount: distinctRecentChats.length,
+                itemBuilder: (context, index) {
+                  final chat = distinctRecentChats[index];
+                  final partnerId = chat['partner_id'];
+                  final lastMessage = chat['last_message'];
 
-                    return FutureBuilder<PostgrestMap?>(
-                        future: _getPartnerDetails(partnerId),
-                        builder: (context, userSnapshot) {
-                          String partnerName = "Loading...";
-                          String? partnerImage; // Image URL save karne ke liye
+                  return FutureBuilder<PostgrestMap?>(
+                    future: _getPartnerDetails(partnerId),
+                    builder: (context, userSnapshot) {
+                      if (userSnapshot.connectionState == ConnectionState.waiting) {
+                        return const SizedBox.shrink();
+                      }
 
-                          if (userSnapshot.hasData && userSnapshot.data != null) {
-                            partnerName = userSnapshot.data!['name'] ?? "Unknown Name";
-                            // 🌟 Aapke tutors table ka exact column 'profile_image' use kar rahe hain
-                            partnerImage = userSnapshot.data!['profile_image'];
-                          } else if (userSnapshot.connectionState == ConnectionState.done) {
-                            partnerName = "Chat Partner";
-                          }
+                      if (userSnapshot.data == null) {
+                        return const SizedBox.shrink();
+                      }
 
-                          return Card (
-                            margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                              // 🖼️ Responsive aur Safe Profile Image Setup
-                              leading: CircleAvatar(
-                                radius: 24,
-                                backgroundColor: const Color(0xff0f766e),
-                                backgroundImage: partnerImage != null && partnerImage.toString().isNotEmpty
-                                    ? NetworkImage(partnerImage.toString())
-                                    : null,
-                                child: partnerImage == null || partnerImage.toString().isEmpty
-                                    ? Text(
-                                  partnerName.isNotEmpty ? partnerName[0].toUpperCase() : '?',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                                )
-                                    : null,
+                      final partnerData = userSnapshot.data!;
+                      final String partnerName = partnerData['name'] ?? "Unknown Name";
+                      final String? partnerImage = partnerData['profile_image'];
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: CircleAvatar(
+                            radius: 24,
+                            backgroundColor: const Color(0xff0f766e),
+                            backgroundImage: partnerImage != null && partnerImage.toString().isNotEmpty
+                                ? NetworkImage(partnerImage.toString())
+                                : null,
+                            child: partnerImage == null || partnerImage.toString().isEmpty
+                                ? Text(
+                              partnerName.isNotEmpty ? partnerName[0].toUpperCase() : '?',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18
                               ),
-                              title: Text(
-                                partnerName,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            )
+                                : null,
+                          ),
+                          title: Text(
+                            partnerName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          subtitle: Text(
+                            lastMessage,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => StudentChatScreen(
+                                  receiverId: partnerId,
+                                  receiverName: partnerName,
+                                ),
                               ),
-                              subtitle: Text(
-                                lastMessage,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.black54),
-                              ),
-                              trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => StudentChatScreen(
-                                      receiverId: partnerId,
-                                      receiverName: partnerName,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        }
-                    );
-                  });
-            }
-        )
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
