@@ -7,7 +7,7 @@ import 'package:quran_learning_application/screen/teacher_screen/home_screen.dar
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_screen.dart';
-import 'teacher_screen/message_screen.dart';
+import 'teacher_screen/tutor_message_screen.dart';
 import 'teacher_screen/setting_screen.dart';
 import 'teacher_screen/students_list_screen.dart';
 

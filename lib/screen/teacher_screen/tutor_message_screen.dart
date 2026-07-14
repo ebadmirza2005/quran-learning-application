@@ -3,14 +3,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../student_screen/student_chat_screen.dart';
 
-class StudentMessageScreen extends StatefulWidget {
-  const StudentMessageScreen({super.key});
+class MessageScreen extends StatefulWidget {
+  const MessageScreen({super.key});
 
   @override
-  State<StudentMessageScreen> createState() => _StudentMessageScreenState();
+  State<MessageScreen> createState() => _MessageScreenState();
 }
 
-class _StudentMessageScreenState extends State<StudentMessageScreen> {
+class _MessageScreenState extends State<MessageScreen> {
   final _supabase = Supabase.instance.client;
   late final String _currentUserId;
 
@@ -23,10 +23,11 @@ class _StudentMessageScreenState extends State<StudentMessageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        backgroundColor: const Color(0xffd2dad2), // App standard background
         appBar: AppBar(
-          backgroundColor: Color(0xff0f766e),
+          backgroundColor: const Color(0xff0f766e),
           foregroundColor: Colors.white,
-          title: Text("Messages"),
+          title: const Text("Messages"),
           centerTitle: true,
         ),
         body: StreamBuilder<List<Map<String, dynamic>>>(
@@ -51,7 +52,7 @@ class _StudentMessageScreenState extends State<StudentMessageScreen> {
 
               if (myMessages.isEmpty) {
                 return const Center(
-                  child: Text("No Conversation Found!"),
+                  child: Text("No Conversation Found!", style: TextStyle(color: Colors.black54),),
                 );
               }
 
@@ -84,11 +85,13 @@ class _StudentMessageScreenState extends State<StudentMessageScreen> {
                         future: _getPartnerDetails(partnerId),
                         builder: (context, userSnapshot) {
                           String partnerName = "Loading...";
-                          String? partnerImage;
+                          String? partnerImage; // Image URL save karne ke liye
+
                           if (userSnapshot.hasData && userSnapshot.data != null) {
                             partnerName = userSnapshot.data!['name'] ?? "Unknown Name";
+                            // 🌟 Aapke tutors table ka exact column 'profile_image' use kar rahe hain
                             partnerImage = userSnapshot.data!['profile_image'];
-                          }else if(userSnapshot.connectionState == ConnectionState.done) {
+                          } else if (userSnapshot.connectionState == ConnectionState.done) {
                             partnerName = "Chat Partner";
                           }
 
@@ -138,7 +141,6 @@ class _StudentMessageScreenState extends State<StudentMessageScreen> {
                           );
                         }
                     );
-
                   });
             }
         )
@@ -152,10 +154,8 @@ class _StudentMessageScreenState extends State<StudentMessageScreen> {
 
       final studentData = await _supabase.from('students').select('name, profile_image').eq('id', id).maybeSingle();
       return studentData;
-    }catch (e) {
+    } catch (e) {
       return null;
     }
   }
 }
-
-

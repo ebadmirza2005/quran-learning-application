@@ -222,7 +222,7 @@ class _TutorListScreenState extends State<TutorListScreen> {
                                     color: Colors.white,
                                 ),
                                 child: IconButton(onPressed: () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const TutorChatScreen()));
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => TutorChatScreen(receiverId: tutor['id'], receiverName: tutor['name'],)));
                                 }, icon: Icon(Icons.message, color: Color(0xff0f766e),))),
                           )
                         ],
