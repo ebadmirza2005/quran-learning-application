@@ -1,7 +1,5 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:quran_learning_application/utils/text.dart';
 import '../../tutor_home_screen.dart';
 import 'qaida_index_tab.dart';
 import 'quran_index_tab.dart';

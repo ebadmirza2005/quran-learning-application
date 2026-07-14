@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/text.dart';
+import '../teacher_screen/tutor_chat_screen.dart';
 
 class TutorListScreen extends StatefulWidget {
   const TutorListScreen({super.key});
@@ -221,6 +222,7 @@ class _TutorListScreenState extends State<TutorListScreen> {
                                     color: Colors.white,
                                 ),
                                 child: IconButton(onPressed: () {
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const TutorChatScreen()));
                                 }, icon: Icon(Icons.message, color: Color(0xff0f766e),))),
                           )
                         ],

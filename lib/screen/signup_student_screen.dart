@@ -4,11 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import '../utils/auth_field.dart';
-import '../utils/button.dart';
 import '../utils/drop_down_widget.dart';
 import '../utils/text.dart';
 import 'student_home_screen.dart';
-import 'tutor_home_screen.dart';
 
 class SignupStudentScreen extends StatefulWidget {
   const SignupStudentScreen({super.key});
