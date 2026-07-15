@@ -39,7 +39,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     super.dispose();
   }
 
-  // 📥 Existing Data Load Logic
   Future<void> _loadExistingTutorData() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -59,7 +58,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         setState(() {
           _hourlyRateController.text = (data['hourly_rate'] ?? 0.0).toString();
 
-          // JSON parsing safety checks
           if (data['employments'] != null) {
             _employments = List<Map<String, dynamic>>.from(data['employments']);
           }
@@ -77,7 +75,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     }
   }
 
-  // 🌟 Universal Permission Checker
   Future<bool> _checkPermission() async {
     if (!Platform.isAndroid) return true;
 
@@ -92,7 +89,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     return status.isGranted;
   }
 
-  // 🎵 Pick Audio File
   Future<void> _pickAudio() async {
     bool hasPermission = await _checkPermission();
     if (!hasPermission) {
@@ -117,7 +113,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     }
   }
 
-  // 🎥 Pick Video File
   Future<void> _pickVideo() async {
     bool hasPermission = await _checkPermission();
     if (!hasPermission) {
@@ -142,7 +137,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     }
   }
 
-  // 📂 Helper: Dialog for Adding Employment
   void _showAddEmploymentDialog() {
     final companyController = TextEditingController();
     final roleController = TextEditingController();
@@ -202,7 +196,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     );
   }
 
-  // 🎓 Helper: Dialog for Adding Certification / Ijazah
   void _showAddCertificationDialog() {
     final titleController = TextEditingController();
     final issuerController = TextEditingController();
@@ -263,7 +256,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     );
   }
 
-  // 🚀 Upload File Helper
   Future<String?> _uploadFileToBucket(File file, String name, String folder) async {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -307,7 +299,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         videoUrl = await _uploadFileToBucket(_selectedVideoFile!, _videoFileName!, 'videos');
       }
 
-      // 3. Prepare Update Map
       final Map<String, dynamic> updateData = {
         'hourly_rate': double.tryParse(_hourlyRateController.text) ?? 0.0,
         'employments': _employments, // Local array state is saved cleanly
@@ -321,13 +312,12 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         updateData['recitation_video_url'] = videoUrl;
       }
 
-      // 4. Update Database Query
       await _supabase
           .from('tutors')
           .update(updateData)
           .eq('id', user.id);
 
-      _showSnackBar("Profile successfully update ho gayi! 🎉", Colors.green);
+      _showSnackBar("Profile successfully updated! 🎉", Colors.green);
 
       setState(() {
         _selectedAudioFile = null;
@@ -371,282 +361,283 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
       ),
       body: _isLoading && _employments.isEmpty && _certifications.isEmpty
           ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
-          : SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              elevation: 0,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey[200]!),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextWidget(text: "Hourly Fee (\$ )"),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: _hourlyRateController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
-              child: Text(
-                "Recitation Audio",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[700]),
-              ),
-            ),
-            InkWell(
-              onTap: _isLoading ? null : _pickAudio,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: _selectedAudioFile != null ? themeColor.withOpacity(0.05) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _selectedAudioFile != null ? themeColor : Colors.grey[300]!,
-                    width: 1.5,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: _selectedAudioFile != null ? themeColor : Colors.grey[100],
-                      child: Icon(
-                        Icons.audiotrack,
-                        size: 28,
-                        color: _selectedAudioFile != null ? Colors.white : Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _audioFileName ?? "Tap To Choose Recitation Audio",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: _audioFileName != null ? FontWeight.w600 : FontWeight.w500,
-                        color: _audioFileName != null ? Colors.black87 : Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
-              child: Text(
-                "Recitation Video",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[700]),
-              ),
-            ),
-            InkWell(
-              onTap: _isLoading ? null : _pickVideo,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: _selectedVideoFile != null ? themeColor.withOpacity(0.05) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _selectedVideoFile != null ? themeColor : Colors.grey[300]!,
-                    width: 1.5,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: _selectedVideoFile != null ? themeColor : Colors.grey[100],
-                      child: Icon(
-                        Icons.video_file,
-                        size: 28,
-                        color: _selectedVideoFile != null ? Colors.white : Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _videoFileName ?? "Tap To Choose Recitation Video",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: _videoFileName != null ? FontWeight.w600 : FontWeight.w500,
-                        color: _videoFileName != null ? Colors.black87 : Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            Container(
-              decoration: BoxDecoration(
+          : SafeArea(
+            child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                elevation: 0,
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: themeColor.withOpacity(0.5)),
-              ),
-              child: ExpansionTile(
-                shape: const Border(),
-                collapsedShape: const Border(),
-                leading: Icon(Icons.business_center_outlined, color: themeColor),
-                title: const Text("Employment History", style: TextStyle(fontWeight: FontWeight.w500)),
-                children: [
-                  if (_employments.isNotEmpty)
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _employments.length,
-                      itemBuilder: (context, index) {
-                        final item = _employments[index];
-                        return ListTile(
-                          title: Text("${item['role']} at ${item['company']}", style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text(item['duration'] ?? ''),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () {
-                              setState(() {
-                                _employments.removeAt(index);
-                              });
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Center(
-                      child: _employments.isEmpty ? const Text("No Employment History Found!") : null,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _showAddEmploymentDialog,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add, size: 18, color: themeColor),
-                        const SizedBox(width: 4),
-                        TextWidget(text: "Add Employment", textColor: themeColor),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // 4. CERTIFICATIONS ACCORDION
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: themeColor.withOpacity(0.5)),
-              ),
-              child: ExpansionTile(
-                shape: const Border(),
-                collapsedShape: const Border(),
-                leading: Icon(Icons.verified_outlined, color: themeColor),
-                title: const Text("Certifications / Ijazah", style: TextStyle(fontWeight: FontWeight.w500)),
-                children: [
-                  if (_certifications.isNotEmpty)
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _certifications.length,
-                      itemBuilder: (context, index) {
-                        final item = _certifications[index];
-                        return ListTile(
-                          title: Text(item['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text("By ${item['issuer']} (${item['year']})"),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () {
-                              setState(() {
-                                _certifications.removeAt(index);
-                              });
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Center(
-                      child: _certifications.isEmpty ? const Text("No Certification Found!") : null,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _showAddCertificationDialog,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add, size: 18, color: themeColor),
-                        const SizedBox(width: 4),
-                        TextWidget(text: "Add Certification", textColor: themeColor),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
-
-            // SAVE CHANGES BUTTON
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _saveChangesToSupabase,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xff0f766e),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey[300],
-                  disabledForegroundColor: Colors.grey[500],
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey[200]!),
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                )
-                    : const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(text: "Hourly Fee (\$ )"),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: _hourlyRateController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            
+              Padding(
+                padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
+                child: Text(
+                  "Recitation Audio",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+                ),
+              ),
+              InkWell(
+                onTap: _isLoading ? null : _pickAudio,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: _selectedAudioFile != null ? themeColor.withOpacity(0.05) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _selectedAudioFile != null ? themeColor : Colors.grey[300]!,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: _selectedAudioFile != null ? themeColor : Colors.grey[100],
+                        child: Icon(
+                          Icons.audiotrack,
+                          size: 28,
+                          color: _selectedAudioFile != null ? Colors.white : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _audioFileName ?? "Tap To Choose Recitation Audio",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: _audioFileName != null ? FontWeight.w600 : FontWeight.w500,
+                          color: _audioFileName != null ? Colors.black87 : Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            
+              Padding(
+                padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
+                child: Text(
+                  "Recitation Video",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+                ),
+              ),
+              InkWell(
+                onTap: _isLoading ? null : _pickVideo,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: _selectedVideoFile != null ? themeColor.withOpacity(0.05) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _selectedVideoFile != null ? themeColor : Colors.grey[300]!,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: _selectedVideoFile != null ? themeColor : Colors.grey[100],
+                        child: Icon(
+                          Icons.video_file,
+                          size: 28,
+                          color: _selectedVideoFile != null ? Colors.white : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _videoFileName ?? "Tap To Choose Recitation Video",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: _videoFileName != null ? FontWeight.w600 : FontWeight.w500,
+                          color: _videoFileName != null ? Colors.black87 : Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: themeColor.withOpacity(0.5)),
+                ),
+                child: ExpansionTile(
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  leading: Icon(Icons.business_center_outlined, color: themeColor),
+                  title: const Text("Employment History", style: TextStyle(fontWeight: FontWeight.w500)),
                   children: [
-                    Icon(Icons.check_circle_outline, size: 20),
-                    SizedBox(width: 8),
-                    Text("Save Changes", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    if (_employments.isNotEmpty)
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _employments.length,
+                        itemBuilder: (context, index) {
+                          final item = _employments[index];
+                          return ListTile(
+                            title: Text("${item['role']} at ${item['company']}", style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text(item['duration'] ?? ''),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  _employments.removeAt(index);
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Center(
+                        child: _employments.isEmpty ? const Text("No Employment History Found!") : null,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _showAddEmploymentDialog,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add, size: 18, color: themeColor),
+                          const SizedBox(width: 4),
+                          TextWidget(text: "Add Employment", textColor: themeColor),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+              const SizedBox(height: 12),
+            
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: themeColor.withOpacity(0.5)),
+                ),
+                child: ExpansionTile(
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  leading: Icon(Icons.verified_outlined, color: themeColor),
+                  title: const Text("Certifications / Ijazah", style: TextStyle(fontWeight: FontWeight.w500)),
+                  children: [
+                    if (_certifications.isNotEmpty)
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _certifications.length,
+                        itemBuilder: (context, index) {
+                          final item = _certifications[index];
+                          return ListTile(
+                            title: Text(item['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text("By ${item['issuer']} (${item['year']})"),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  _certifications.removeAt(index);
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Center(
+                        child: _certifications.isEmpty ? const Text("No Certification Found!") : null,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _showAddCertificationDialog,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add, size: 18, color: themeColor),
+                          const SizedBox(width: 4),
+                          TextWidget(text: "Add Certification", textColor: themeColor),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+            
+              // SAVE CHANGES BUTTON
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _saveChangesToSupabase,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xff0f766e),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey[300],
+                    disabledForegroundColor: Colors.grey[500],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  )
+                      : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_outline, size: 20),
+                      SizedBox(width: 8),
+                      Text("Save Changes", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+                    ),
+                  ),
+          ),
     );
   }
 }
