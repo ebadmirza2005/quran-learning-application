@@ -1,11 +1,16 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart'; // Safe media picker video ke liye
 import 'package:permission_handler/permission_handler.dart';
 import 'package:quran_learning_application/utils/text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../tutor_home_screen.dart';
+
+// Safe Global Lock: Multiple native threads ko overlap hone se bachata hai
+bool _globalFilePickerLock = false;
 
 class TutorEditInfo extends StatefulWidget {
   const TutorEditInfo({super.key});
@@ -80,27 +85,44 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
   Future<bool> _checkPermission() async {
     if (!Platform.isAndroid) return true;
 
+    // Android 13+ par Permission.audio check karega, purane devices par storage permission
     if (await Permission.audio.isGranted || await Permission.storage.isGranted) {
       return true;
     }
 
-    PermissionStatus status = await Permission.storage.request();
-    if (status.isDenied) {
-      status = await Permission.audio.request();
-    }
-    return status.isGranted;
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.audio,
+      Permission.storage,
+    ].request();
+
+    return statuses[Permission.audio] == PermissionStatus.granted ||
+        statuses[Permission.storage] == PermissionStatus.granted;
   }
 
   Future<void> _pickAudio() async {
-    bool hasPermission = await _checkPermission();
-    if (!hasPermission) {
-      _showSnackBar("Storage permission zaroori hai!", Colors.orange);
+    if (_globalFilePickerLock) {
+      debugPrint("Lock is active. Bypassing request.");
       return;
     }
 
+    bool hasPermission = await _checkPermission();
+    if (!hasPermission) {
+      _showSnackBar("Audio files select karne ke liye permission zaroori hai!", Colors.orange);
+      return;
+    }
+
+    setState(() {
+      _globalFilePickerLock = true;
+    });
+
+    // Device framework cooldown delay
+    await Future.delayed(const Duration(milliseconds: 250));
+
     try {
+      // Custom extensions ke zariye Android native file-explorer ko target kar rahe hain
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.audio,
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg'],
         allowMultiple: false,
       );
 
@@ -110,32 +132,76 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
           _audioFileName = result.files.single.name;
         });
       }
+    } on PlatformException catch (platErr) {
+      debugPrint("Main picker failed on Android thread: ${platErr.message}");
+      // Fallback dynamic file selection (In case file picker channel blocks)
+      try {
+        FilePickerResult? fallbackResult = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          allowMultiple: false,
+        );
+        if (fallbackResult != null && fallbackResult.files.single.path != null) {
+          setState(() {
+            _selectedAudioFile = File(fallbackResult.files.single.path!);
+            _audioFileName = fallbackResult.files.single.name;
+          });
+        }
+      } catch (innerErr) {
+        debugPrint("Fallback audio selection also failed: $innerErr");
+      }
     } catch (e) {
       debugPrint("Error Picking Audio: $e");
+    } finally {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        setState(() {
+          _globalFilePickerLock = false;
+        });
+      }
     }
   }
 
   Future<void> _pickVideo() async {
-    bool hasPermission = await _checkPermission();
-    if (!hasPermission) {
-      _showSnackBar("Storage permission zaroori hai!", Colors.orange);
+    if (_globalFilePickerLock) {
+      debugPrint("Lock active. Video picker is currently running.");
       return;
     }
 
+    bool hasPermission = await _checkPermission();
+    if (!hasPermission) {
+      _showSnackBar("Video select karne ke liye permission zaroori hai!", Colors.orange);
+      return;
+    }
+
+    setState(() {
+      _globalFilePickerLock = true;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 250));
+
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.video,
-        allowMultiple: false,
+      // ImagePicker gallery videos picking ke liye highly optimized aur bug-free hai
+      final ImagePicker picker = ImagePicker();
+      final XFile? video = await picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 5),
       );
 
-      if (result != null && result.files.single.path != null) {
+      if (video != null) {
         setState(() {
-          _selectedVideoFile = File(result.files.single.path!);
-          _videoFileName = result.files.single.name;
+          _selectedVideoFile = File(video.path);
+          _videoFileName = video.name;
         });
       }
     } catch (e) {
       debugPrint("Error Picking Video: $e");
+    } finally {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        setState(() {
+          _globalFilePickerLock = false;
+        });
+      }
     }
   }
 
@@ -264,7 +330,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
       final fileExtension = name.split('.').last;
       final uploadPath = '$folder/$timestamp.$fileExtension';
 
-      // 'tutor-assets' bucket use ho raha hai
       await _supabase.storage.from('tutor-assets').upload(
         uploadPath,
         file,
@@ -328,16 +393,19 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         _videoFileName = null;
       });
 
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
+      if (mounted) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
+      }
 
-      _loadExistingTutorData();
     } catch (e) {
       debugPrint("Database Update Error: $e");
       _showSnackBar("Save fails: $e", Colors.redAccent);
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -352,8 +420,14 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     final themeColor = const Color(0xff0f766e);
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xffd2dad2),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
+          },
+        ),
         backgroundColor: themeColor,
         foregroundColor: Colors.white,
         title: const Text(
@@ -366,10 +440,10 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
       body: _isLoading && _employments.isEmpty && _certifications.isEmpty
           ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
           : SafeArea(
-            child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Card(
@@ -384,7 +458,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextWidget(text: "Hourly Fee (\$ )"),
+                      const TextWidget(text: "Hourly Fee (\$ )"),
                       const SizedBox(height: 10),
                       TextFormField(
                         controller: _hourlyRateController,
@@ -400,7 +474,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                 ),
               ),
               const SizedBox(height: 12),
-            
+
               Padding(
                 padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
                 child: Text(
@@ -448,7 +522,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                 ),
               ),
               const SizedBox(height: 12),
-            
+
               Padding(
                 padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
                 child: Text(
@@ -496,7 +570,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                 ),
               ),
               const SizedBox(height: 12),
-            
+
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -552,7 +626,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                 ),
               ),
               const SizedBox(height: 12),
-            
+
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -608,8 +682,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                 ),
               ),
               const SizedBox(height: 40),
-            
-              // SAVE CHANGES BUTTON
+
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -640,9 +713,9 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                 ),
               ),
             ],
-                    ),
-                  ),
           ),
+        ),
+      ),
     );
   }
 }

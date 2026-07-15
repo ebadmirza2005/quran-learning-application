@@ -402,6 +402,12 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
     return Scaffold(
       backgroundColor: const Color(0xffd2dad2),
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
+          },
+        ),
         backgroundColor: const Color(0xff0f766e),
         foregroundColor: Colors.white,
         title: const TextWidget(text: 'Personal Info'),

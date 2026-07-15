@@ -75,6 +75,7 @@ class _SettingScreenState extends State<SettingScreen> {
   Widget build(BuildContext context) {
     final _height = MediaQuery.of(context).size.height;
     return Material(
+      color: const Color(0xffd2dad2),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
@@ -125,7 +126,7 @@ class _SettingScreenState extends State<SettingScreen> {
                       children: [
                         const Icon(Icons.person, color: Color(0xff0f766e),),
                         TextButtonWidget(buttonText: "Personal Info", onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const TutorPersonalInfo()));
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorPersonalInfo()));
                         },
                         )
                       ],
@@ -135,7 +136,7 @@ class _SettingScreenState extends State<SettingScreen> {
                       children: [
                         const Icon(Icons.edit_square, color: Color(0xff0f766e),),
                         TextButtonWidget(buttonText: "Edit Info", onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const TutorEditInfo()));
+                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorEditInfo()));
                         },)
                       ],
                     ),
