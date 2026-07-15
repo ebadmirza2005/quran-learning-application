@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
 import '../auth_screen.dart';
+import 'tutor_change_password_screen.dart';
 import 'tutor_edit_info.dart';
 import 'tutor_location_screen.dart';
 import 'tutor_personal_info.dart';
@@ -151,10 +152,12 @@ class _SettingScreenState extends State<SettingScreen> {
                       ],
                     ),
                     const SizedBox(height: 10,),
-                    const Row(
+                    Row(
                       children: [
                         Icon(Icons.lock, color: Color(0xff0f766e),),
-                        TextButtonWidget(buttonText: "Change Password",)
+                        TextButtonWidget(buttonText: "Change Password", onTap: () {
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorChangePasswordScreen()));
+                        },)
                       ],
                     ),
                     const SizedBox(height: 10,),
