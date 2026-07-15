@@ -29,7 +29,6 @@ class _SignupAuthScreenState extends State<SignupStudentScreen> {
   bool _isAgree = false;
 
   String? selectedTutorGender;
-  String? selectedRate;
   String? selectedGender;
 
   String _selectedCountry = "Select Country";
@@ -59,7 +58,7 @@ class _SignupAuthScreenState extends State<SignupStudentScreen> {
       _showSnackBar("Passwords do not match!");
     }
 
-    if (selectedTutorGender == null || selectedRate == null || selectedGender == null || _selectedCountry == "Select Country" || _selectedTimeZone == "Select Timezone") {
+    if (selectedTutorGender == null || selectedGender == null || _selectedCountry == "Select Country" || _selectedTimeZone == "Select Timezone") {
       _showSnackBar("Please fill all the required fields.");
       return;
     }
@@ -87,7 +86,6 @@ class _SignupAuthScreenState extends State<SignupStudentScreen> {
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
           'tutor_gender': selectedTutorGender,
-          'rate': selectedRate,
           'student_gender': selectedGender,
           'phone': _phoneController.text.trim(),
           'password': _passwordController.text.trim(),
@@ -196,188 +194,177 @@ class _SignupAuthScreenState extends State<SignupStudentScreen> {
         foregroundColor: Colors.white,
         backgroundColor: const Color(0xff0f766e),
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 10,),
-              SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.6,
-                  child: Image.asset("assets/logo.png")),
-              AuthField(authFieldText: "Name", controller: _nameController,),
-              const SizedBox(height: 10,),
-              AuthField(authFieldText: "Email", controller: _emailController),
-              const SizedBox(height: 10,),
-              DropdownWidget(
-                hintText: "Select Preferred Tutor Gender",
-                items: const ["Male", "Female", "Either"],
-                selectedValue: selectedTutorGender,
-                onChanged: (String? newValue) {
-                  setState(() {
-                    selectedTutorGender = newValue;
-                  });
-                },
-              ),
-              const SizedBox(height: 10,),
-
-              DropdownWidget(
-                hintText: "Select Rate",
-                items: const ['\$3 - \$5', '\$5 - \$10', '\$10 - \$20', '\$20+'],
-                selectedValue: selectedRate,
-                onChanged: (String? newValue) {
-                  setState(() {
-                    selectedRate = newValue;
-                  });
-                },
-              ),
-              const SizedBox(height: 10,),
-
-              DropdownWidget(
-                hintText: "Select Your Gender",
-                items: const ["Male", "Female"],
-                selectedValue: selectedGender,
-                onChanged: (String? newValue) {
-                  setState(() {
-                    selectedGender = newValue;
-                  });
-                },
-              ),
-              const SizedBox(height: 10,),
-              AuthField(authFieldText: "Phone Number", controller: _phoneController,),
-              const SizedBox(height: 10,),
-
-              // Password Row
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.85,
-                child: Row(
-                  children: [
-                    Expanded(child: AuthField(authFieldText: "Password", controller: _passwordController,)),
-                    SizedBox(width: 5),
-                    Expanded(child: AuthField(authFieldText: "Re-Type Password", controller: _confirmPasswordController)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10,),
-
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.85,
-                child: InkWell(
-                  onTap: () {
-                    showCountryPicker(
-                      context: context,
-                      onSelect: (Country country) {
-                        setState(() {
-                          _selectedCountry = "${country.name} (${country.countryCode}) ${country.flagEmoji}";
-                        });
-                        _loadTimeZone(country);
-                      },
-                    );
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 10,),
+                SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.6,
+                    child: Image.asset("assets/logo.png")),
+                AuthField(authFieldText: "Name", controller: _nameController,),
+                const SizedBox(height: 10,),
+                AuthField(authFieldText: "Email", controller: _emailController),
+                const SizedBox(height: 10,),
+                DropdownWidget(
+                  hintText: "Select Preferred Tutor Gender",
+                  items: const ["Male", "Female", "Either"],
+                  selectedValue: selectedTutorGender,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      selectedTutorGender = newValue;
+                    });
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: Color(0xffd2dad2),
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _selectedCountry,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: _selectedCountry == "Select Country"
-                                ? Colors.grey[600]
-                                : Colors.black,
-                          ),
-                        ),
-                        const Icon(Icons.arrow_drop_down_sharp),
-                      ],
-                    ),
+                ),
+                const SizedBox(height: 10,),
+                DropdownWidget(
+                  hintText: "Select Your Gender",
+                  items: const ["Male", "Female"],
+                  selectedValue: selectedGender,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      selectedGender = newValue;
+                    });
+                  },
+                ),
+                const SizedBox(height: 10,),
+                AuthField(authFieldText: "Phone Number", controller: _phoneController,),
+                const SizedBox(height: 10,),
+        
+                // Password Row
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.85,
+                  child: Row(
+                    children: [
+                      Expanded(child: AuthField(authFieldText: "Password", controller: _passwordController,)),
+                      SizedBox(width: 5),
+                      Expanded(child: AuthField(authFieldText: "Re-Type Password", controller: _confirmPasswordController)),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 10,),
-              AuthField(authFieldText: "City", controller: _cityController),
-              const SizedBox(height: 10),
-              DropdownWidget(hintText: "Select Timezone", items: _availableTimeZones, selectedValue: _selectedTimeZone, onChanged: (String? newValue) {
-                setState(() {
-                  _selectedTimeZone = newValue!;
-                });
-              },),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: fieldWidth,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const TextWidget(
-                      text: "I want to learn",
-                      textColor: Color(0xff0f766e),
-                      textWeight: FontWeight.bold,
-                    ),
-                    const SizedBox(height: 5),
-
-                    for (int i = 0; i < skillsKeys.length; i += 2) ...[
-                      Row(
+                const SizedBox(height: 10,),
+        
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.85,
+                  child: InkWell(
+                    onTap: () {
+                      showCountryPicker(
+                        context: context,
+                        onSelect: (Country country) {
+                          setState(() {
+                            _selectedCountry = "${country.name} (${country.countryCode}) ${country.flagEmoji}";
+                          });
+                          _loadTimeZone(country);
+                        },
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Color(0xffd2dad2),
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(child: _buildSkillItem(skillsKeys[i])),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: (i + 1 < skillsKeys.length)
-                                ? _buildSkillItem(skillsKeys[i + 1])
-                                : const SizedBox(),
+                          Text(
+                            _selectedCountry,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: _selectedCountry == "Select Country"
+                                  ? Colors.grey[600]
+                                  : Colors.black,
+                            ),
                           ),
+                          const Icon(Icons.arrow_drop_down_sharp),
                         ],
                       ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10,),
+                AuthField(authFieldText: "City", controller: _cityController),
+                const SizedBox(height: 10),
+                DropdownWidget(hintText: "Select Timezone", items: _availableTimeZones, selectedValue: _selectedTimeZone, onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedTimeZone = newValue!;
+                  });
+                },),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: fieldWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const TextWidget(
+                        text: "I want to learn",
+                        textColor: Color(0xff0f766e),
+                        textWeight: FontWeight.bold,
+                      ),
+                      const SizedBox(height: 5),
+        
+                      for (int i = 0; i < skillsKeys.length; i += 2) ...[
+                        Row(
+                          children: [
+                            Expanded(child: _buildSkillItem(skillsKeys[i])),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: (i + 1 < skillsKeys.length)
+                                  ? _buildSkillItem(skillsKeys[i + 1])
+                                  : const SizedBox(),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Checkbox(
+                      activeColor: const Color(0xff0f766e),
+                      value: _isAgree,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          _isAgree = value ?? false;
+                        });
+                      },
+                    ),
+                    const TextWidget(text: "By signing up, you agree to our "),
+                    const TextWidget(text: "terms of use", textColor: Color(0xff0f766e)),
                   ],
                 ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Checkbox(
-                    activeColor: const Color(0xff0f766e),
-                    value: _isAgree,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        _isAgree = value ?? false;
-                      });
-                    },
-                  ),
-                  const TextWidget(text: "By signing up, you agree to our "),
-                  const TextWidget(text: "terms of use", textColor: Color(0xff0f766e)),
-                ],
-              ),
-              const SizedBox(height: 20,),
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.85,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xff0f766e),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                const SizedBox(height: 20,),
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.85,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff0f766e),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                  ),
-                  onPressed: _signUpStudent,
-                  child: _isLoading
-                      ? CircularProgressIndicator(
-                    color: Colors.white,
-                  )
-                      : Text(
-                    "Sign Up",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                    onPressed: _signUpStudent,
+                    child: _isLoading
+                        ? CircularProgressIndicator(
                       color: Colors.white,
+                    )
+                        : Text(
+                      "Sign Up",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
