@@ -189,66 +189,89 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
     }
   }
 
-  // Handle Image Display (Local File vs Network URL)
   ImageProvider? _getProfileImage() {
     if (_imageFile != null) {
-      return FileImage(_imageFile!); // Jab nayi image select ho
+      return FileImage(_imageFile!); 
     } else if (_imageUrl != null && _imageUrl!.isNotEmpty) {
-      return NetworkImage(_imageUrl!); // Jab database se purani image load ho
+      return NetworkImage(_imageUrl!); 
     }
     return null;
   }
 
   void _showImageSourceBottomSheet(BuildContext context) {
-    showModalBottomSheet(
+    showGeneralDialog(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const TextWidget(
-                text: "Select Profile Picture",
-                textWeight: FontWeight.bold,
-                textSize: 18,
+      barrierDismissible: true,
+      barrierLabel: "Dismiss",
+      barrierColor: Colors.black.withAlpha(128), // Background dimming
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return Align(
+          alignment: Alignment.topCenter, // Top per alignment
+          child: Material(
+            type: MaterialType.transparency,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 20, // Status bar spacing
+                bottom: 20,
+                left: 10,
+                right: 10,
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)), // Bottom corners rounded
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff0f766e),
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _pickImage(ImageSource.camera);
-                    },
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text("Camera"),
+                  const TextWidget(
+                    text: "Select Profile Picture",
+                    textWeight: FontWeight.bold,
+                    textSize: 18,
                   ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff0f766e),
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _pickImage(ImageSource.gallery);
-                    },
-                    icon: const Icon(Icons.image),
-                    label: const Text("Gallery"),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xff0f766e),
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _pickImage(ImageSource.camera);
+                        },
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text("Camera"),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xff0f766e),
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _pickImage(ImageSource.gallery);
+                        },
+                        icon: const Icon(Icons.image),
+                        label: const Text("Gallery"),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, -1),
+          ).animate(anim1),
+          child: child,
         );
       },
     );
@@ -386,195 +409,197 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
-          : Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              const SizedBox(height: 30),
-
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: const Color(0xff0f766e),
-                    backgroundImage: _getProfileImage(),
-                    child: _getProfileImage() == null
-                        ? const Icon(Icons.person, color: Colors.white, size: 50)
-                        : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: -4,
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: Colors.grey.shade200,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.edit, color: Color(0xff0f766e), size: 18),
-                        onPressed: () => _showImageSourceBottomSheet(context),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Name
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Name", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  AuthField(authFieldText: "Name", controller: _nameController)
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Email
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Email", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  AuthField(authFieldText: "someone@example.com", controller: _emailController)
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Phone No
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Phone No", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  AuthField(authFieldText: "03xxxxxxxxxx", controller: _phoneController)
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Date of Birth
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Date of Birth", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  InkWell(
-                    onTap: () => _selectDate(context),
-                    child: Container(
-                      width: fieldWidth,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                      decoration: BoxDecoration(
-                        color: Color(0xffd2dad2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade400),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _dobController.text.isEmpty ? "dd-MM-yyyy" : _dobController.text,
-                            style: TextStyle(
-                              color: _dobController.text.isEmpty ? Colors.grey.shade600 : Colors.black,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const Icon(Icons.calendar_month, color: Color(0xff0f766e)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Languages
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Languages", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  InkWell(
-                    onTap: () => _showMultiSelectBottomSheet(context),
-                    child: Container(
-                      width: fieldWidth,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                      decoration: BoxDecoration(
-                        color: Color(0xffd2dad2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade400),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _selectedLanguages.isEmpty
-                                  ? "Select Languages"
-                                  : _selectedLanguages.join(", "),
-                              style: TextStyle(
-                                color: _selectedLanguages.isEmpty ? Colors.grey.shade600 : Colors.black,
-                                fontSize: 16,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(Icons.arrow_drop_down, color: Color(0xff0f766e)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Skills
-              SizedBox(
-                width: fieldWidth,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          : SafeArea(
+            child: Center(
+                    child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                const SizedBox(height: 30),
+            
+                Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    const TextWidget(text: "I can teach", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                    for (int i = 0; i < skillsKeys.length; i += 2) ...[
-                      Row(
-                        children: [
-                          Expanded(child: _buildSkillItem(skillsKeys[i])),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: (i + 1 < skillsKeys.length)
-                                ? _buildSkillItem(skillsKeys[i + 1])
-                                : const SizedBox(),
-                          ),
-                        ],
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: const Color(0xff0f766e),
+                      backgroundImage: _getProfileImage(),
+                      child: _getProfileImage() == null
+                          ? const Icon(Icons.person, color: Colors.white, size: 50)
+                          : null,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: -4,
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Colors.grey.shade200,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.edit, color: Color(0xff0f766e), size: 18),
+                          onPressed: () => _showImageSourceBottomSheet(context),
+                        ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 10),
-
-              // Save Button
-              SizedBox(
-                width: fieldWidth,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xff0f766e),
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: _isLoading ? null : _saveTutorData,
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Save"),
+                const SizedBox(height: 20),
+            
+                // Name
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Name", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    AuthField(authFieldText: "Name", controller: _nameController)
+                  ],
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 10),
+            
+                // Email
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Email", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    AuthField(authFieldText: "someone@example.com", controller: _emailController)
+                  ],
+                ),
+                const SizedBox(height: 10),
+            
+                // Phone No
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Phone No", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    AuthField(authFieldText: "03xxxxxxxxxx", controller: _phoneController)
+                  ],
+                ),
+                const SizedBox(height: 10),
+            
+                // Date of Birth
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Date of Birth", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    InkWell(
+                      onTap: () => _selectDate(context),
+                      child: Container(
+                        width: fieldWidth,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                        decoration: BoxDecoration(
+                          color: Color(0xffd2dad2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _dobController.text.isEmpty ? "dd-MM-yyyy" : _dobController.text,
+                              style: TextStyle(
+                                color: _dobController.text.isEmpty ? Colors.grey.shade600 : Colors.black,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const Icon(Icons.calendar_month, color: Color(0xff0f766e)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+            
+                // Languages
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Languages", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    InkWell(
+                      onTap: () => _showMultiSelectBottomSheet(context),
+                      child: Container(
+                        width: fieldWidth,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                        decoration: BoxDecoration(
+                          color: Color(0xffd2dad2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selectedLanguages.isEmpty
+                                    ? "Select Languages"
+                                    : _selectedLanguages.join(", "),
+                                style: TextStyle(
+                                  color: _selectedLanguages.isEmpty ? Colors.grey.shade600 : Colors.black,
+                                  fontSize: 16,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.arrow_drop_down, color: Color(0xff0f766e)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+            
+                // Skills
+                SizedBox(
+                  width: fieldWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const TextWidget(text: "I can teach", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                      for (int i = 0; i < skillsKeys.length; i += 2) ...[
+                        Row(
+                          children: [
+                            Expanded(child: _buildSkillItem(skillsKeys[i])),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: (i + 1 < skillsKeys.length)
+                                  ? _buildSkillItem(skillsKeys[i + 1])
+                                  : const SizedBox(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+            
+                // Save Button
+                SizedBox(
+                  width: fieldWidth,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff0f766e),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _isLoading ? null : _saveTutorData,
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Save"),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+                    ),
+                  ),
           ),
-        ),
-      ),
     );
   }
 
