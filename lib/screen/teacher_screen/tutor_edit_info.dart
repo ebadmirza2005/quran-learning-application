@@ -5,6 +5,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:quran_learning_application/utils/text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../tutor_home_screen.dart';
+
 class TutorEditInfo extends StatefulWidget {
   const TutorEditInfo({super.key});
 
@@ -301,7 +303,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
 
       final Map<String, dynamic> updateData = {
         'hourly_rate': double.tryParse(_hourlyRateController.text) ?? 0.0,
-        'employments': _employments, // Local array state is saved cleanly
+        'employments': _employments,
         'certifications': _certifications,
       };
 
@@ -325,6 +327,8 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         _selectedVideoFile = null;
         _videoFileName = null;
       });
+
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
 
       _loadExistingTutorData();
     } catch (e) {
@@ -386,6 +390,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                         controller: _hourlyRateController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
+                          hintText: "1.0",
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
