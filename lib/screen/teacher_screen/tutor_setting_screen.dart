@@ -5,6 +5,7 @@ import '../../utils/button.dart';
 import '../../utils/text.dart';
 import '../auth_screen.dart';
 import 'tutor_edit_info.dart';
+import 'tutor_location_screen.dart';
 import 'tutor_personal_info.dart';
 
 class SettingScreen extends StatefulWidget {
@@ -141,10 +142,12 @@ class _SettingScreenState extends State<SettingScreen> {
                       ],
                     ),
                     const SizedBox(height: 10,),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.location_on, color: Color(0xff0f766e),),
-                        TextButtonWidget(buttonText: "Location",)
+                        const Icon(Icons.location_on, color: Color(0xff0f766e),),
+                        TextButtonWidget(buttonText: "Location", onTap: () {
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorLocationScreen()));
+                        },)
                       ],
                     ),
                     const SizedBox(height: 10,),

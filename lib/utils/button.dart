@@ -32,6 +32,9 @@ class ElevatedButtonWidget extends StatelessWidget {
         child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: buttonColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)
+              )
             ),
             onPressed: onTap, child: isLoading ? CircularProgressIndicator(color: textColor,) : Text(buttonText, style: TextStyle(
           fontWeight: textWeight,
