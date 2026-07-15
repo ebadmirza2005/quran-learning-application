@@ -14,7 +14,6 @@ class StudentsScreen extends StatefulWidget {
 class _StudentsScreenState extends State<StudentsScreen> {
   final supabase = Supabase.instance.client;
 
-  // 🌟 Safe data converter jo list aur string dono ko safely text bana dega
   String makeDataSafe(dynamic rawData) {
     if (rawData == null) return '-';
     if (rawData is List) {
@@ -23,7 +22,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return rawData.toString();
   }
 
-  // 🌟 Alignment Row Helper (Taake content upar neeche na ho)
   Widget _buildDataRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5.0),
@@ -46,7 +44,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        backgroundColor: const Color(0xffd2dad2), // Background color match kiya
+        backgroundColor: const Color(0xffd2dad2),
         appBar: AppBar(
           backgroundColor: const Color(0xff0f766e),
           foregroundColor: Colors.white,
@@ -86,9 +84,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     String location = student['city'] ?? 'Unknown Location';
                     String country = student['country'] ?? 'Unknown Country';
 
+                    String profileImage = student['profile_image'] ?? '';
+
                     String gender = makeDataSafe(student['student_gender']);
                     String languages = makeDataSafe(student['languages']);
-                    // 🌟 FIXED: Ab agar list ho ya string, yeh safely pass hoga bina error ke
                     String seekingKnowledge = makeDataSafe(student['seeking_knowledge']);
                     String timezone = makeDataSafe(student['timezone']);
 
@@ -98,7 +97,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         clipBehavior: Clip.none,
                         alignment: Alignment.topCenter,
                         children: [
-                          // --- MAIN CARD ---
                           Card(
                             margin: EdgeInsets.zero,
                             clipBehavior: Clip.antiAlias,
@@ -129,8 +127,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 15),
-
-                                  // --- DATA PANEL WITH PERFECT ALIGNMENT ---
                                   Container(
                                     color: const Color(0xff0f766e),
                                     padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
@@ -147,16 +143,53 @@ class _StudentsScreenState extends State<StudentsScreen> {
                               ),
                             ),
                           ),
-
-                          // --- PROFILE AVATAR ---
                           Positioned(
                             top: -30,
                             child: CircleAvatar(
                               radius: 30,
                               backgroundColor: const Color(0xff0f766e),
-                              child: Text(
-                                studentName.isNotEmpty ? studentName[0].toUpperCase() : '?',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(30),
+                                child: profileImage.isNotEmpty
+                                    ? Image.network(
+                                  profileImage,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: Transform.translate(
+                                        offset: const Offset(0, 5),
+                                        child: const Icon(
+                                          Icons.person,
+                                          size: 65,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  },
+                                )
+                                    : Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: Transform.translate(
+                                    offset: const Offset(-2, 6),
+                                    child: const Icon(
+                                      Icons.person,
+                                      size: 65,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -173,8 +206,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 ),
                                 child: IconButton(onPressed: () {
                                   Navigator.push(context, MaterialPageRoute(builder: (_) => StudentChatScreen(receiverId: student['id'].toString(),
-                                  receiverName: studentName,)));
-                                }, icon: Icon(Icons.message, color: Color(0xff0f766e),))),
+                                    receiverName: studentName,)));
+                                }, icon: const Icon(Icons.message, color: Color(0xff0f766e),))),
                           )
                         ],
                       ),

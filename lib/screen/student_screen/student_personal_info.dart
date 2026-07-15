@@ -86,17 +86,16 @@ class _StudentPersonalInfoState extends State<StudentPersonalInfo> {
           }
         });
       }
-    }catch (e) {
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error Fetching Data: $e")),
       );
-    }finally {
+    } finally {
       setState(() {
         _isLoading = false;
       });
     }
   }
-
 
   Future<void> _saveStudentData() async {
     setState(() {
@@ -171,6 +170,7 @@ class _StudentPersonalInfoState extends State<StudentPersonalInfo> {
       }
     }
   }
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -233,132 +233,203 @@ class _StudentPersonalInfoState extends State<StudentPersonalInfo> {
   }
 
   void _showImageSourceBottomSheet(BuildContext context) {
-    showModalBottomSheet(
+    showGeneralDialog(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const TextWidget(
-                text: "Select Profile Picture",
-                textWeight: FontWeight.bold,
-                textSize: 18,
+      barrierDismissible: true,
+      barrierLabel: "Dismiss",
+      barrierColor: Colors.black.withAlpha(128),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 20,
+                bottom: 20,
+                left: 10,
+                right: 10,
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff0f766e),
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _pickImage(ImageSource.camera);
-                    },
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text("Camera"),
+                  const TextWidget(
+                    text: "Select Profile Picture",
+                    textWeight: FontWeight.bold,
+                    textSize: 18,
                   ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff0f766e),
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _pickImage(ImageSource.gallery);
-                    },
-                    icon: const Icon(Icons.image),
-                    label: const Text("Gallery"),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xff0f766e),
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _pickImage(ImageSource.camera);
+                        },
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text("Camera"),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xff0f766e),
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _pickImage(ImageSource.gallery);
+                        },
+                        icon: const Icon(Icons.image),
+                        label: const Text("Gallery"),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, -1),
+            end: const Offset(0, 0),
+          ).animate(anim1),
+          child: child,
         );
       },
     );
   }
-  void _showMultiSelectBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xffd2dad2),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: TextWidget(
-                    text: "Select Languages",
-                    textWeight: FontWeight.bold,
-                    textSize: 18,
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _languagesList.length,
-                    itemBuilder: (context, index) {
-                      final lang = _languagesList[index];
-                      final isChecked = _selectedLanguages.contains(lang);
 
-                      return CheckboxListTile(
-                        title: TextWidget(text: lang),
-                        activeColor: const Color(0xff0f766e),
-                        value: isChecked,
-                        onChanged: (bool? value) {
-                          setModalState(() {
-                            setState(() {
-                              if (value == true) {
-                                _selectedLanguages.add(lang);
-                              } else {
-                                _selectedLanguages.remove(lang);
-                              }
-                            });
-                          });
-                        },
-                      );
-                    },
+  // 🌟 FIXED: Ab Languages sheet bhi image picker ki tarah upar se niche (Top-down slide) open hogi
+  void _showMultiSelectDialog(BuildContext context) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Dismiss",
+      barrierColor: Colors.black.withAlpha(128),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Material(
+            type: MaterialType.transparency,
+            child: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setModalState) {
+                return Container(
+                  width: double.infinity,
+                  // Screen height ke hisab se responsive height set ki hai (max 60% of screen)
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.6,
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 15.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xff0f766e),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top + 20,
+                    bottom: 20,
+                    left: 10,
+                    right: 10,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const TextWidget(
+                        text: "Select Languages",
+                        textWeight: FontWeight.bold,
+                        textSize: 18,
+                      ),
+                      const SizedBox(height: 10),
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _languagesList.length,
+                          itemBuilder: (context, index) {
+                            final lang = _languagesList[index];
+                            final isChecked = _selectedLanguages.contains(lang);
+
+                            return CheckboxListTile(
+                              title: TextWidget(text: lang),
+                              activeColor: const Color(0xff0f766e),
+                              value: isChecked,
+                              onChanged: (bool? value) {
+                                setModalState(() {
+                                  setState(() {
+                                    if (value == true) {
+                                      _selectedLanguages.add(lang);
+                                    } else {
+                                      _selectedLanguages.remove(lang);
+                                    }
+                                  });
+                                });
+                              },
+                            );
+                          },
                         ),
                       ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text("Update", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
+                      const SizedBox(height: 15),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xff0f766e),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: const Text(
+                              "Update",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            );
-          },
+                );
+              },
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, -1),
+            end: const Offset(0, 0),
+          ).animate(anim1),
+          child: child,
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _dobController.dispose();
+    super.dispose();
   }
 
   @override
@@ -368,6 +439,12 @@ class _StudentPersonalInfoState extends State<StudentPersonalInfo> {
     return Scaffold(
       backgroundColor: const Color(0xffd2dad2),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StudentHomeScreen()));
+          },
+        ),
         backgroundColor: const Color(0xff0f766e),
         foregroundColor: Colors.white,
         title: const TextWidget(text: 'Personal Info'),
@@ -375,192 +452,192 @@ class _StudentPersonalInfoState extends State<StudentPersonalInfo> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
-          : Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              const SizedBox(height: 30),
+          : SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                const SizedBox(height: 30),
 
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: const Color(0xff0f766e),
-                    backgroundImage: _getProfileImage(),
-                    child: _getProfileImage() == null
-                        ? const Icon(Icons.person, color: Colors.white, size: 50)
-                        : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: -4,
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: Colors.grey.shade200,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.edit, color: Color(0xff0f766e), size: 18),
-                        onPressed: () => _showImageSourceBottomSheet(context),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Name
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Name", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  AuthField(authFieldText: "Name", controller: _nameController)
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Email
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Email", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  AuthField(authFieldText: "someone@example.com", controller: _emailController)
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Phone No
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Phone No", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  AuthField(authFieldText: "03xxxxxxxxxx", controller: _phoneController)
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Date of Birth
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Date of Birth", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  InkWell(
-                    onTap: () => _selectDate(context),
-                    child: Container(
-                      width: fieldWidth,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                      decoration: BoxDecoration(
-                        color: Color(0xffd2dad2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade400),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _dobController.text.isEmpty ? "dd-MM-yyyy" : _dobController.text,
-                            style: TextStyle(
-                              color: _dobController.text.isEmpty ? Colors.grey.shade600 : Colors.black,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const Icon(Icons.calendar_month, color: Color(0xff0f766e)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Languages
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const TextWidget(text: "Languages", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                  const SizedBox(height: 7),
-                  InkWell(
-                    onTap: () => _showMultiSelectBottomSheet(context),
-                    child: Container(
-                      width: fieldWidth,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                      decoration: BoxDecoration(
-                        color: Color(0xffd2dad2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade400),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _selectedLanguages.isEmpty
-                                  ? "Select Languages"
-                                  : _selectedLanguages.join(", "),
-                              style: TextStyle(
-                                color: _selectedLanguages.isEmpty ? Colors.grey.shade600 : Colors.black,
-                                fontSize: 16,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(Icons.arrow_drop_down, color: Color(0xff0f766e)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Skills
-              SizedBox(
-                width: fieldWidth,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    const TextWidget(text: "I can teach", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
-                    for (int i = 0; i < skillsKeys.length; i += 2) ...[
-                      Row(
-                        children: [
-                          Expanded(child: _buildSkillItem(skillsKeys[i])),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: (i + 1 < skillsKeys.length)
-                                ? _buildSkillItem(skillsKeys[i + 1])
-                                : const SizedBox(),
-                          ),
-                        ],
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: const Color(0xff0f766e),
+                      backgroundImage: _getProfileImage(),
+                      child: _getProfileImage() == null
+                          ? const Icon(Icons.person, color: Colors.white, size: 50)
+                          : null,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: -4,
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Colors.grey.shade200,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.edit, color: Color(0xff0f766e), size: 18),
+                          onPressed: () => _showImageSourceBottomSheet(context),
+                        ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 10),
+                const SizedBox(height: 20),
 
-              // Save Button
-              SizedBox(
-                width: fieldWidth,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xff0f766e),
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: _isLoading ? null : _saveStudentData,
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Save"),
+                // Name
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Name", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    AuthField(authFieldText: "Name", controller: _nameController)
+                  ],
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 10),
+
+                // Email
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Email", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    AuthField(authFieldText: "someone@example.com", controller: _emailController)
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Phone No
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Phone No", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    AuthField(authFieldText: "03xxxxxxxxxx", controller: _phoneController)
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Date of Birth
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Date of Birth", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    InkWell(
+                      onTap: () => _selectDate(context),
+                      child: Container(
+                        width: fieldWidth,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                        decoration: BoxDecoration(
+                          color: const Color(0xffd2dad2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _dobController.text.isEmpty ? "dd-MM-yyyy" : _dobController.text,
+                              style: TextStyle(
+                                color: _dobController.text.isEmpty ? Colors.grey.shade600 : Colors.black,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const Icon(Icons.calendar_month, color: Color(0xff0f766e)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Languages
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(text: "Languages", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                    const SizedBox(height: 7),
+                    InkWell(
+                      onTap: () => _showMultiSelectDialog(context),
+                      child: Container(
+                        width: fieldWidth,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                        decoration: BoxDecoration(
+                          color: const Color(0xffd2dad2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selectedLanguages.isEmpty
+                                    ? "Select Languages"
+                                    : _selectedLanguages.join(", "),
+                                style: TextStyle(
+                                  color: _selectedLanguages.isEmpty ? Colors.grey.shade600 : Colors.black,
+                                  fontSize: 16,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.arrow_drop_down, color: Color(0xff0f766e)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: fieldWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const TextWidget(text: "I want to learn", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
+                      for (int i = 0; i < skillsKeys.length; i += 2) ...[
+                        Row(
+                          children: [
+                            Expanded(child: _buildSkillItem(skillsKeys[i])),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: (i + 1 < skillsKeys.length)
+                                  ? _buildSkillItem(skillsKeys[i + 1])
+                                  : const SizedBox(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Save Button
+                SizedBox(
+                  width: fieldWidth,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff0f766e),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _isLoading ? null : _saveStudentData,
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Save"),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),

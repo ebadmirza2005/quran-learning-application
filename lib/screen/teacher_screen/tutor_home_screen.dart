@@ -34,9 +34,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         foregroundColor: Colors.white,
         title: const Text("Classroom"),
         centerTitle: true,
-        actions: [
-          IconButton(onPressed: () {}, icon: Icon(Icons.notifications))
-        ],
         bottom: TabBar(
           controller: tabController,
           indicatorColor: Colors.white,

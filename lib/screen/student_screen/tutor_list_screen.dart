@@ -169,8 +169,6 @@ class _TutorListScreenState extends State<TutorListScreen> {
                               ),
                             ),
                           ),
-
-                          // --- FLOATING PROFILE AVATAR ---
                           Positioned(
                             top: -30,
                             child: CircleAvatar(
@@ -185,10 +183,15 @@ class _TutorListScreenState extends State<TutorListScreen> {
                                   height: 60,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
-                                    return Center(
-                                      child: Text(
-                                        tutorName.isNotEmpty ? tutorName[0].toUpperCase() : '?',
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                                    return Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: Transform.translate(
+                                        offset: const Offset(0, 5),
+                                        child: const Icon(
+                                          Icons.person,
+                                          size: 65,
+                                          color: Colors.white,
+                                        ),
                                       ),
                                     );
                                   },
@@ -202,9 +205,16 @@ class _TutorListScreenState extends State<TutorListScreen> {
                                     );
                                   },
                                 )
-                                    : Text(
-                                  tutorName.isNotEmpty ? tutorName[0].toUpperCase() : '?',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                                    : Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: Transform.translate(
+                                    offset: const Offset(0, 5),
+                                    child: const Icon(
+                                      Icons.person,
+                                      size: 65,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -215,15 +225,15 @@ class _TutorListScreenState extends State<TutorListScreen> {
                             top: -15,
                             child: Container(
                                 decoration: BoxDecoration(
-                                    border: Border.all(
-                                        color: Colors.black
-                                    ),
-                                    shape: BoxShape.circle,
-                                    color: Colors.white,
+                                  border: Border.all(
+                                      color: Colors.black
+                                  ),
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
                                 ),
                                 child: IconButton(onPressed: () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (_) => TutorChatScreen(receiverId: tutor['id'], receiverName: tutor['name'],)));
-                                }, icon: Icon(Icons.message, color: Color(0xff0f766e),))),
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => TutorChatScreen(receiverId: tutor['id'].toString(), receiverName: tutorName,)));
+                                }, icon: const Icon(Icons.message, color: Color(0xff0f766e),))),
                           )
                         ],
                       ),

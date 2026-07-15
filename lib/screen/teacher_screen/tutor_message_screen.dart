@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:quran_learning_application/utils/text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../student_screen/student_chat_screen.dart';
+import 'tutor_chat_screen.dart';
 
 class MessageScreen extends StatefulWidget {
   const MessageScreen({super.key});
@@ -20,7 +23,19 @@ class _MessageScreenState extends State<MessageScreen> {
     _currentUserId = _supabase.auth.currentUser!.id;
   }
 
-  // 🌟 Supabase se dono tables (tutors aur students) ke saare valid/existing users ki IDs lekar aate hain
+  Future<Map<String, dynamic>?> _getPartnerDetails(String id) async {
+    try {
+      final tutorData = await _supabase.from('tutors').select('name, profile_image').eq('id', id).maybeSingle();
+      if (tutorData != null) return tutorData;
+
+      final studentData = await _supabase.from('students').select('name, profile_image').eq('id', id).maybeSingle();
+      return studentData;
+    } catch (e) {
+      debugPrint("Error fetching partner details: $e");
+      return null;
+    }
+  }
+
   Future<Set<String>> _getValidUserIds() async {
     try {
       final tutors = await _supabase.from('tutors').select('id');
@@ -39,6 +54,16 @@ class _MessageScreenState extends State<MessageScreen> {
     }
   }
 
+  String _formatMessageTime(String? timestamp) {
+    if (timestamp == null) return '';
+    try {
+      final parsedDate = DateTime.parse(timestamp).toLocal();
+      return DateFormat('hh:mm a').format(parsedDate);
+    } catch (e) {
+      return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,7 +74,6 @@ class _MessageScreenState extends State<MessageScreen> {
         title: const Text("Messages"),
         centerTitle: true,
       ),
-      // 🌟 FutureBuilder se pehle valid (jo deleted nahi hain) users ki list mangwa rahe hain
       body: FutureBuilder<Set<String>>(
         future: _getValidUserIds(),
         builder: (context, validUsersSnapshot) {
@@ -81,7 +105,6 @@ class _MessageScreenState extends State<MessageScreen> {
 
               final allMessages = snapshot.data ?? [];
 
-              // 🌟 Filter 1: Woh messages jo is user ke hain
               final myMessages = allMessages.where((msg) {
                 return msg['sender_id'] == _currentUserId || msg['receiver_id'] == _currentUserId;
               }).toList();
@@ -94,7 +117,6 @@ class _MessageScreenState extends State<MessageScreen> {
                     ? msg['receiver_id']
                     : msg['sender_id'];
 
-                // 🌟 Filter 2: Sirf un users ko add karein jo delete nahi hue (validUserIds ke andar hain)
                 if (validUserIds.contains(partnerId)) {
                   if (!chatPartnerIds.contains(partnerId)) {
                     chatPartnerIds.add(partnerId);
@@ -107,7 +129,6 @@ class _MessageScreenState extends State<MessageScreen> {
                 }
               }
 
-              // 🌟 Agar filter karne ke baad koi valid conversation nahi bachi (ya saare partners delete ho chuke hain)
               if (distinctRecentChats.isEmpty) {
                 return const Center(
                   child: Text(
@@ -125,8 +146,9 @@ class _MessageScreenState extends State<MessageScreen> {
                   final chat = distinctRecentChats[index];
                   final partnerId = chat['partner_id'];
                   final lastMessage = chat['last_message'];
+                  final messageTime = chat['time'];
 
-                  return FutureBuilder<PostgrestMap?>(
+                  return FutureBuilder<Map<String, dynamic>?>(
                     future: _getPartnerDetails(partnerId),
                     builder: (context, userSnapshot) {
                       if (userSnapshot.connectionState == ConnectionState.waiting) {
@@ -169,17 +191,30 @@ class _MessageScreenState extends State<MessageScreen> {
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                           subtitle: Text(
-                            lastMessage,
+                            lastMessage ?? '',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(color: Colors.black54),
                           ),
-                          trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              TextWidget(
+                                text: _formatMessageTime(messageTime),
+                                textSize: 11,
+                                textColor: Colors.black45,
+                                textWeight: FontWeight.w500,
+                              ),
+                              const SizedBox(height: 4),
+                              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                            ],
+                          ),
                           onTap: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => StudentChatScreen(
+                                builder: (_) =>  TutorChatScreen(
                                   receiverId: partnerId,
                                   receiverName: partnerName,
                                 ),
@@ -197,17 +232,5 @@ class _MessageScreenState extends State<MessageScreen> {
         },
       ),
     );
-  }
-
-  Future<PostgrestMap?> _getPartnerDetails(String id) async {
-    try {
-      final tutorData = await _supabase.from('tutors').select('name, profile_image').eq('id', id).maybeSingle();
-      if (tutorData != null) return tutorData;
-
-      final studentData = await _supabase.from('students').select('name, profile_image').eq('id', id).maybeSingle();
-      return studentData;
-    } catch (e) {
-      return null;
-    }
   }
 }

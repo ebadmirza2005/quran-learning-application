@@ -109,7 +109,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
 
       if (_imageFile != null) {
         final fileExtension = _imageFile!.path.split('.').last;
-        
+
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final path = '${user.id}/profile_$timestamp.$fileExtension';
 
@@ -191,9 +191,9 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
 
   ImageProvider? _getProfileImage() {
     if (_imageFile != null) {
-      return FileImage(_imageFile!); 
+      return FileImage(_imageFile!);
     } else if (_imageUrl != null && _imageUrl!.isNotEmpty) {
-      return NetworkImage(_imageUrl!); 
+      return NetworkImage(_imageUrl!);
     }
     return null;
   }
@@ -203,24 +203,24 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
       context: context,
       barrierDismissible: true,
       barrierLabel: "Dismiss",
-      barrierColor: Colors.black.withAlpha(128), // Background dimming
+      barrierColor: Colors.black.withAlpha(128),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, anim1, anim2) {
         return Align(
-          alignment: Alignment.topCenter, // Top per alignment
+          alignment: Alignment.topCenter,
           child: Material(
             type: MaterialType.transparency,
             child: Container(
               width: double.infinity,
               padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 20, // Status bar spacing
+                top: MediaQuery.of(context).padding.top + 20,
                 bottom: 20,
                 left: 10,
                 right: 10,
               ),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)), // Bottom corners rounded
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -270,6 +270,117 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
         return SlideTransition(
           position: Tween<Offset>(
             begin: const Offset(0, -1),
+            end: const Offset(0, 0),
+          ).animate(anim1),
+          child: child,
+        );
+      },
+    );
+  }
+
+  // 🌟 FIXED: Ab Languages ki sheet bhi upar se slide ho kar dynamic dialog ki tarah open hogi
+  void _showMultiSelectDialog(BuildContext context) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Dismiss",
+      barrierColor: Colors.black.withAlpha(128),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Material(
+            type: MaterialType.transparency,
+            child: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setModalState) {
+                return Container(
+                  width: double.infinity,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.6, // Screen ke 60% se zyada na ho
+                  ),
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top + 20,
+                    bottom: 20,
+                    left: 10,
+                    right: 10,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const TextWidget(
+                        text: "Select Languages",
+                        textWeight: FontWeight.bold,
+                        textSize: 18,
+                      ),
+                      const SizedBox(height: 10),
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _languagesList.length,
+                          itemBuilder: (context, index) {
+                            final lang = _languagesList[index];
+                            final isChecked = _selectedLanguages.contains(lang);
+
+                            return CheckboxListTile(
+                              title: TextWidget(text: lang),
+                              activeColor: const Color(0xff0f766e),
+                              value: isChecked,
+                              onChanged: (bool? value) {
+                                setModalState(() {
+                                  setState(() {
+                                    if (value == true) {
+                                      _selectedLanguages.add(lang);
+                                    } else {
+                                      _selectedLanguages.remove(lang);
+                                    }
+                                  });
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xff0f766e),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: const Text(
+                              "Update",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, -1),
+            end: const Offset(0, 0),
           ).animate(anim1),
           child: child,
         );
@@ -310,81 +421,6 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
     }
   }
 
-  void _showMultiSelectBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xffd2dad2),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: TextWidget(
-                    text: "Select Languages",
-                    textWeight: FontWeight.bold,
-                    textSize: 18,
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _languagesList.length,
-                    itemBuilder: (context, index) {
-                      final lang = _languagesList[index];
-                      final isChecked = _selectedLanguages.contains(lang);
-
-                      return CheckboxListTile(
-                        title: TextWidget(text: lang),
-                        activeColor: const Color(0xff0f766e),
-                        value: isChecked,
-                        onChanged: (bool? value) {
-                          setModalState(() {
-                            setState(() {
-                              if (value == true) {
-                                _selectedLanguages.add(lang);
-                              } else {
-                                _selectedLanguages.remove(lang);
-                              }
-                            });
-                          });
-                        },
-                      );
-                    },
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 15.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xff0f766e),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text("Update", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   void dispose() {
     _nameController.dispose();
@@ -403,7 +439,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
       backgroundColor: const Color(0xffd2dad2),
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
           },
@@ -416,13 +452,13 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
           : SafeArea(
-            child: Center(
-                    child: SingleChildScrollView(
+        child: Center(
+          child: SingleChildScrollView(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 const SizedBox(height: 30),
-            
+
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -451,7 +487,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                   ],
                 ),
                 const SizedBox(height: 20),
-            
+
                 // Name
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +498,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                   ],
                 ),
                 const SizedBox(height: 10),
-            
+
                 // Email
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -473,7 +509,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                   ],
                 ),
                 const SizedBox(height: 10),
-            
+
                 // Phone No
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,7 +520,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                   ],
                 ),
                 const SizedBox(height: 10),
-            
+
                 // Date of Birth
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,7 +533,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                         width: fieldWidth,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                         decoration: BoxDecoration(
-                          color: Color(0xffd2dad2),
+                          color: const Color(0xffd2dad2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.grey.shade400),
                         ),
@@ -519,7 +555,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                   ],
                 ),
                 const SizedBox(height: 10),
-            
+
                 // Languages
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,12 +563,12 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                     const TextWidget(text: "Languages", textColor: Color(0xff0f766e), textWeight: FontWeight.bold),
                     const SizedBox(height: 7),
                     InkWell(
-                      onTap: () => _showMultiSelectBottomSheet(context),
+                      onTap: () => _showMultiSelectDialog(context), // 🌟 FIXED: Ab languages screen bhi upar se slide dialog call karegi
                       child: Container(
                         width: fieldWidth,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                         decoration: BoxDecoration(
-                          color: Color(0xffd2dad2),
+                          color: const Color(0xffd2dad2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.grey.shade400),
                         ),
@@ -559,7 +595,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                   ],
                 ),
                 const SizedBox(height: 10),
-            
+
                 // Skills
                 SizedBox(
                   width: fieldWidth,
@@ -584,7 +620,7 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                   ),
                 ),
                 const SizedBox(height: 10),
-            
+
                 // Save Button
                 SizedBox(
                   width: fieldWidth,
@@ -603,9 +639,9 @@ class _TutorPersonalInfoState extends State<TutorPersonalInfo> {
                 const SizedBox(height: 20),
               ],
             ),
-                    ),
-                  ),
           ),
+        ),
+      ),
     );
   }
 

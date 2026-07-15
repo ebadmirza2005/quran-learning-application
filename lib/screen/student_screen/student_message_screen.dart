@@ -23,6 +23,7 @@ class _StudentMessageScreenState extends State<StudentMessageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        backgroundColor: const Color(0xffd2dad2),
         appBar: AppBar(
           backgroundColor: Color(0xff0f766e),
           foregroundColor: Colors.white,
@@ -98,7 +99,6 @@ class _StudentMessageScreenState extends State<StudentMessageScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                              // 🖼️ Responsive aur Safe Profile Image Setup
                               leading: CircleAvatar(
                                 radius: 24,
                                 backgroundColor: const Color(0xff0f766e),
