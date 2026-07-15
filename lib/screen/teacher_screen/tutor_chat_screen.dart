@@ -19,6 +19,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   String? _receiverProfileUrl;
   bool _isLoadingProfile = true;
 
+  final List<Map<String, dynamic>> _localMessages = [];
 
   String _formatMessageTime(String? timestamp) {
     if (timestamp == null) return '';
@@ -97,6 +98,21 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
     _messageController.clear();
 
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    final localMsg = {
+      'id': tempId,
+      'sender_id': _currentUserId,
+      'receiver_id': widget.receiverId.trim(),
+      'message_text': text,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'is_read': false,
+      'is_sending': true,
+    };
+
+    setState(() {
+      _localMessages.insert(0, localMsg);
+    });
+
     try {
       await _supabase.from('messages').insert({
         'sender_id': _currentUserId,
@@ -105,7 +121,14 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         'created_at': DateTime.now().toUtc().toIso8601String(),
         'is_read': false,
       });
+
+      setState(() {
+        _localMessages.removeWhere((msg) => msg['id'] == tempId);
+      });
     } catch (e) {
+      setState(() {
+        _localMessages.removeWhere((msg) => msg['id'] == tempId);
+      });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
@@ -186,17 +209,9 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                     .stream(primaryKey: ['id'])
                     .order('created_at', ascending: false),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)));
-                  }
+                  final dbMessages = snapshot.data ?? [];
 
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text("No conversation yet"));
-                  }
-
-                  final allMessages = snapshot.data!;
-
-                  final chatMessages = allMessages.where((msg) {
+                  final chatMessages = dbMessages.where((msg) {
                     final sId = msg['sender_id'].toString().trim().toLowerCase();
                     final rId = msg['receiver_id'].toString().trim().toLowerCase();
                     final current = _currentUserId.trim().toLowerCase();
@@ -205,15 +220,22 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                     return (sId == current && rId == partner) || (sId == partner && rId == current);
                   }).toList();
 
+                  final combinedMessages = [..._localMessages, ...chatMessages];
+
+                  if (combinedMessages.isEmpty) {
+                    return const Center(child: Text("No conversation yet"));
+                  }
+
                   return ListView.builder(
                     reverse: true,
                     padding: const EdgeInsets.all(16),
-                    itemCount: chatMessages.length,
+                    itemCount: combinedMessages.length,
                     itemBuilder: (context, index) {
-                      final msg = chatMessages[index];
+                      final msg = combinedMessages[index];
 
                       final bool isMe = msg['sender_id'].toString().trim().toLowerCase() == _currentUserId.trim().toLowerCase();
                       final bool isRead = msg['is_read'] ?? false;
+                      final bool isSending = msg['is_sending'] ?? false;
 
                       return Container(
                         margin: const EdgeInsets.symmetric(vertical: 4),
@@ -251,13 +273,15 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                                   children: [
                                     if (isMe) ...[
                                       Icon(
-                                        Icons.done_all,
+                                        isSending ? Icons.access_time : Icons.done_all,
                                         size: 14,
-                                        color: isRead ? Colors.tealAccent : Colors.white70,
+                                        color: isSending
+                                            ? Colors.white54
+                                            : (isRead ? Colors.tealAccent : Colors.white70),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        isRead ? "Seen" : "Sent",
+                                        isSending ? "Sending..." : (isRead ? "Seen" : "Sent"),
                                         style: const TextStyle(
                                           fontSize: 10,
                                           color: Colors.white70,
