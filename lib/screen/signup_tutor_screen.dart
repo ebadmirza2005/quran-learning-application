@@ -56,6 +56,11 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
       return;
     }
 
+    if (_selectedTimeZone == "Select Timezone") {
+      _showSnackBar("Please select your timezone");
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -64,6 +69,7 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
       final authResponse = await _supabase.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        emailRedirectTo: 'com.example.quran_learning_application://login-callback/',
       );
 
       final user = authResponse.user;
@@ -91,13 +97,16 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
 
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
+          MaterialPageRoute(
+            builder: (_) => const EmailVerificationPendingScreen(),
+          ),
               (Route route) => false,
         );
       }
+    } on AuthException catch (e) {
+      _showSnackBar(e.message);
     } catch (e) {
-      // _showSnackBar("Error: ${e.toString()}");
-      _showSnackBar("User Already Registered!");
+      _showSnackBar("An unexpected error occurred.");
     } finally {
       if (mounted) {
         setState(() {
@@ -436,6 +445,67 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
         ),
         Flexible(child: TextWidget(text: skillName)),
       ],
+    );
+  }
+}
+
+class EmailVerificationPendingScreen extends StatelessWidget {
+  const EmailVerificationPendingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xffd2dad2),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.mark_email_unread_rounded,
+              size: 100,
+              color: Color(0xff0f766e),
+            ),
+            const SizedBox(height: 30),
+            const Text(
+              "Verify Your Email",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xff0f766e),
+              ),
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              "Humne aapke email address par ek confirmation link bheja hai. Please apna inbox check karein aur account verify karne ke liye link par click karein.",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xff0f766e),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () {
+                  // User ko validation ke baad wapis Login screen par le jayen
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                },
+                child: const Text(
+                  "Go to Login",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -21,6 +21,19 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     _startLogoTimer();
     _navigateToNextScreen();
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final Session? session = data.session;
+      final AuthChangeEvent event = data.event;
+
+      if (event == AuthChangeEvent.signedIn && session != null) {
+        // User verify ho chuka hai! Ab direct home screen par bhej dein
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
+              (Route route) => false,
+        );
+      }
+    });
   }
 
   void _startLogoTimer() async {

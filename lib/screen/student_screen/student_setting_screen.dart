@@ -6,6 +6,7 @@ import '../../utils/button.dart';
 import '../../utils/text.dart';
 import '../auth_screen.dart';
 import 'student_change_password_screen.dart';
+import 'student_contact_screen.dart';
 import 'student_location_screen.dart';
 import 'student_personal_info.dart';
 
@@ -170,7 +171,9 @@ class _StudentSettingScreenState extends State<StudentSettingScreen> {
                     Row(
                       children: [
                         const Icon(Icons.contact_mail, color: Color(0xff0f766e),),
-                        TextButtonWidget(buttonText: "Contact Us",)
+                        TextButtonWidget(buttonText: "Contact Us", onTap: () {
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StudentContactScreen()));
+                        },)
                       ],
                     ),
                   ],

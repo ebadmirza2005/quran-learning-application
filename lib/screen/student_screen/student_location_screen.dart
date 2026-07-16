@@ -32,7 +32,6 @@ class _StudentLocationScreenState extends State<StudentLocationScreen> {
     _loadStudentData();
   }
 
-  // --- Supabase se data fetch karne ka logic ---
   Future<void> _loadStudentData() async {
     final student = Supabase.instance.client.auth.currentUser;
     if (student != null) {
