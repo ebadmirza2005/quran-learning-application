@@ -1,26 +1,26 @@
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:quran_learning_application/utils/button.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../utils/auth_field.dart';
+import '../../utils/button.dart';
 import '../../utils/drop_down_widget.dart';
-import '../tutor_home_screen.dart';
+import '../../utils/text.dart';
+import '../student_home_screen.dart';
 
-class TutorLocationScreen extends StatefulWidget {
-  const TutorLocationScreen({super.key});
+class StudentLocationScreen extends StatefulWidget {
+  const StudentLocationScreen({super.key});
 
   @override
-  State<TutorLocationScreen> createState() => _TutorLocationScreenState();
+  State<StudentLocationScreen> createState() => _StudentLocationScreenState();
 }
 
-class _TutorLocationScreenState extends State<TutorLocationScreen> {
+class _StudentLocationScreenState extends State<StudentLocationScreen> {
   final _cityController = TextEditingController();
   final _addressController = TextEditingController();
 
-  bool _isLoading = true;
-  bool _isUpdating = false;
+  bool isLoading = false;
 
   String _selectedCountry = "Select Country";
   String? _selectedTimeZone = "Select Timezone";
@@ -29,14 +29,16 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
   @override
   void initState() {
     super.initState();
-    _loadTutorData();
+    _loadStudentData();
   }
 
-  Future<void> _loadTutorData() async {
-    final tutor = Supabase.instance.client.auth.currentUser;
-    if (tutor != null) {
+  // --- Supabase se data fetch karne ka logic ---
+  Future<void> _loadStudentData() async {
+    final student = Supabase.instance.client.auth.currentUser;
+    if (student != null) {
+      setState(() => isLoading = true);
       try {
-        final data = await Supabase.instance.client.from('tutors').select().eq('id', tutor.id).single();
+        final data = await Supabase.instance.client.from('students').select().eq('id', student.id).single();
 
         if (data != null) {
           setState(() {
@@ -54,30 +56,28 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
               }
               _selectedTimeZone = savedZone;
             }
-
-            _isLoading = false;
           });
         }
-      } catch (e) {
-        setState(() => _isLoading = false);
-        print("Data Loading Error: $e");
+      } catch(e) {
+        debugPrint("Data Loading Error: $e");
+      } finally {
+        setState(() => isLoading = false);
       }
-    } else {
-      setState(() => _isLoading = false);
     }
   }
 
+  // --- NEW: Supabase par data UPDATE karne ka logic ---
   Future<void> _updateLocation() async {
-    final tutor = Supabase.instance.client.auth.currentUser;
+    final student = Supabase.instance.client.auth.currentUser;
 
-    if (tutor == null) {
+    // 1. Validation checks
+    if (student == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("User not authenticated!"), backgroundColor: Colors.red),
       );
       return;
     }
 
-    // 2. Input Validation checks
     if (_selectedCountry == "Select Country" ||
         _selectedTimeZone == "Select Timezone" ||
         _cityController.text.trim().isEmpty ||
@@ -88,45 +88,47 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
       return;
     }
 
-    setState(() => _isUpdating = true);
+    setState(() => isLoading = true);
 
     try {
-      await Supabase.instance.client.from('tutors').update({
+      // 2. Supabase query to update data
+      await Supabase.instance.client.from('students').update({
         'country': _selectedCountry,
         'city': _cityController.text.trim(),
         'timezone': _selectedTimeZone,
         'address': _addressController.text.trim(),
-      }).eq('id', tutor.id);
+      }).eq('id', student.id);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Location updated successfully!"), backgroundColor: Colors.green),
+          const SnackBar(content: Text("Location updated successfully!"), backgroundColor: Color(0xff0f766e)),
         );
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StudentHomeScreen()));
       }
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Update Failed: $e"), backgroundColor: Colors.red),
+          SnackBar(content: Text("Update Failed: $e"), backgroundColor: Color(0xff0f766e)),
         );
       }
     } finally {
-      if (mounted) setState(() => _isUpdating = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   void _loadTimeZone(Country country) async {
     String code = country.countryCode.toUpperCase();
-    List<String> matchedZones = [];
+    List<String> matchedZone = [];
 
     try {
-      if (tz.timeZoneDatabase.locations.isNotEmpty) {
-        matchedZones = tz.timeZoneDatabase.locations.keys.where((zoneKey) {
+      if(tz.timeZoneDatabase.locations.isNotEmpty) {
+        matchedZone = tz.timeZoneDatabase.locations.keys.where((zoneKey) {
           final lowerKey = zoneKey.toLowerCase();
           List<String> parts = lowerKey.split('/');
 
           if (parts.length > 1) {
-            if (code == "US" && zoneKey.startsWith("America/")) {
+            if (code == 'US' && zoneKey.startsWith("America/")) {
               return zoneKey.contains("New_York") ||
                   zoneKey.contains("Chicago") ||
                   zoneKey.contains("Denver") ||
@@ -134,7 +136,6 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
                   zoneKey.contains("Anchorage") ||
                   zoneKey.contains("Honolulu");
             }
-
             String searchName = country.name.toLowerCase().replaceAll(' ', '_');
             if (lowerKey.contains(searchName)) return true;
           }
@@ -144,10 +145,9 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
     } catch (e) {
       debugPrint("Timezone Filter Error: $e");
     }
-
     setState(() {
-      if (matchedZones.isNotEmpty) {
-        _availableTimeZones = ["Select Timezone", ...matchedZones];
+      if (matchedZone.isNotEmpty) {
+        _availableTimeZones = ["Select Timezone", ...matchedZone];
         _selectedTimeZone = "Select Timezone";
       } else {
         if (code == "PK") _availableTimeZones = ["Select Timezone", "Asia/Karachi"];
@@ -179,17 +179,14 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
     return Scaffold(
       backgroundColor: const Color(0xffd2dad2),
       appBar: AppBar(
-        leading: IconButton(onPressed: () {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
-        }, icon: const Icon(Icons.arrow_back)),
         backgroundColor: const Color(0xff0f766e),
         foregroundColor: Colors.white,
+        leading: IconButton(onPressed: () {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StudentHomeScreen()));
+        }, icon: const Icon(Icons.arrow_back)),
         title: const Text("Location"),
-        centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
-          : SingleChildScrollView(
+      body: SingleChildScrollView(
         child: Center(
           child: Column(
             children: [
@@ -198,15 +195,12 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
                 width: MediaQuery.of(context).size.width * 0.85,
                 child: InkWell(
                   onTap: () {
-                    showCountryPicker(
-                      context: context,
-                      onSelect: (Country country) {
-                        setState(() {
-                          _selectedCountry = "${country.name} (${country.countryCode}) ${country.flagEmoji}";
-                        });
-                        _loadTimeZone(country);
-                      },
-                    );
+                    showCountryPicker(context: context, onSelect: (Country country) {
+                      setState(() {
+                        _selectedCountry = "${country.name} (${country.countryCode}) ${country.flagEmoji}";
+                      });
+                      _loadTimeZone(country);
+                    });
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -218,15 +212,7 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _selectedCountry,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: _selectedCountry == "Select Country"
-                                ? Colors.grey[600]
-                                : Colors.black,
-                          ),
-                        ),
+                        TextWidget(text: _selectedCountry, textSize: 16, textColor: _selectedCountry == "Select Country" ? Colors.grey[600] : Colors.black,),
                         const Icon(Icons.arrow_drop_down_sharp),
                       ],
                     ),
@@ -238,8 +224,8 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
               const SizedBox(height: 12),
               DropdownWidget(
                 hintText: "Select Timezone",
-                items: _availableTimeZones,
                 selectedValue: _selectedTimeZone,
+                items: _availableTimeZones,
                 onChanged: (String? newValue) {
                   setState(() {
                     _selectedTimeZone = newValue;
@@ -272,7 +258,7 @@ class _TutorLocationScreenState extends State<TutorLocationScreen> {
                 textColor:  Colors.white,
                 buttonColor: const Color(0xff0f766e),
                 onTap: _updateLocation,
-                isLoading: _isUpdating,
+                isLoading: isLoading,
               )
             ],
           ),

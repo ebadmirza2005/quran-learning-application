@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
 import '../auth_screen.dart';
+import 'student_change_password_screen.dart';
+import 'student_location_screen.dart';
 import 'student_personal_info.dart';
 
 class StudentSettingScreen extends StatefulWidget {
@@ -75,6 +77,7 @@ class _StudentSettingScreenState extends State<StudentSettingScreen> {
   Widget build(BuildContext context) {
     final _height = MediaQuery.of(context).size.height;
     return Material(
+      color: Color(0xffd2dad2),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
@@ -127,7 +130,7 @@ class _StudentSettingScreenState extends State<StudentSettingScreen> {
                       children: [
                         const Icon(Icons.person, color: Color(0xff0f766e),),
                         TextButtonWidget(buttonText: "Personal Info", onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentPersonalInfo()));
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StudentPersonalInfo()));
                         })
                       ],
                     ),
@@ -135,14 +138,18 @@ class _StudentSettingScreenState extends State<StudentSettingScreen> {
                     Row(
                       children: [
                         const Icon(Icons.pin_drop, color: Color(0xff0f766e),),
-                        TextButtonWidget(buttonText: "Location",)
+                        TextButtonWidget(buttonText: "Location", onTap: () {
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StudentLocationScreen()));
+                        })
                       ],
                     ),
                     const SizedBox(height: 10,),
                     Row(
                       children: [
                         const Icon(Icons.lock, color: Color(0xff0f766e),),
-                        TextButtonWidget(buttonText: "Change Password",)
+                        TextButtonWidget(buttonText: "Change Password", onTap: () {
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StudentChangePasswordScreen()));
+                        },)
                       ],
                     ),
                     const SizedBox(height: 10,),

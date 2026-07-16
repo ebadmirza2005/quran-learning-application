@@ -75,7 +75,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   Widget build(BuildContext context) {
     return ZoomDrawer(
       controller: _drawerController,
-      menuScreenWidth: 200,
+      menuScreenWidth: 210,
       menuScreen: const StudentSettingScreen(),
       mainScreen: Scaffold(
         backgroundColor: const Color(0xffd2dad2),
