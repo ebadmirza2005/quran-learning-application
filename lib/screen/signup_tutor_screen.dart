@@ -583,7 +583,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               ),
               const SizedBox(height: 20),
               Text(
-                "Humne ek 6-digit OTP code aapke email\n${widget.email} par bheja hai.",
+                "We have sent a 6-digit OTP code to your email\n${widget.email}.",
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 16, color: Colors.black87),
               ),

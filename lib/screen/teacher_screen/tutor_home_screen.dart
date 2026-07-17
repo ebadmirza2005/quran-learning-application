@@ -62,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ),
                   ElevatedButtonWidget(buttonText: "Pay & Take Test", buttonColor: Color(0xff0f766e), textColor: Colors.white, onTap: () {
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorTestScreen()));
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const TutorTestScreen()));
                   },),
                   SizedBox(height: 14),
                 ],

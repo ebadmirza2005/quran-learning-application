@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../tutor_home_screen.dart';
+
 class TutorTestScreen extends StatefulWidget {
   const TutorTestScreen({super.key});
 
@@ -16,7 +18,8 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
   bool _isLoading = true;
   int _currentIndex = 0;
 
-  final Map<int, String> _selectedAnswers = {};
+  // Map key ko String (Question ID) banaya hai taake random hone par answers mix na hon
+  final Map<String, String> _selectedAnswers = {};
 
   @override
   void initState() {
@@ -29,7 +32,12 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
       final List<dynamic> response = await supabase.from('screening_questions').select();
 
       setState(() {
-        _questions = List<Map<String, dynamic>>.from(response);
+        List<Map<String, dynamic>> fetchedQuestions = List<Map<String, dynamic>>.from(response);
+
+        // 🌟 Yahan hum list ko randomly shuffle kar rahe hain
+        fetchedQuestions.shuffle();
+
+        _questions = fetchedQuestions;
         _isLoading = false;
       });
     } catch (e) {
@@ -49,8 +57,13 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
 
     int correctCount = 0;
     for (int i = 0; i < _questions.length; i++) {
-      String correctAnswer = _questions[i]['correct_option'].toString().trim().toUpperCase();
-      String? userAnswer = _selectedAnswers[i]?.trim().toUpperCase();
+      final question = _questions[i];
+      // Hum database se ID ya unique text uthayenge key ke taur par
+      String questionId = question['id']?.toString() ?? question['question_text'].toString();
+
+      String correctAnswer = question['correct_option'].toString().trim().toUpperCase();
+      String? userAnswer = _selectedAnswers[questionId]?.trim().toUpperCase();
+
       if (userAnswer == correctAnswer) {
         correctCount++;
       }
@@ -72,6 +85,8 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
         await supabase.from('tutors').update({
           'rating': 5.0,
         }).eq('id', currentTutorId);
+
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TutorHomeScreen()));
 
         _showResultDialog(title: "Congratulations! 🎉", message: "You have passed the test.", isSuccess: true);
       } else {
@@ -159,6 +174,7 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
     }
 
     final currentQuestion = _questions[_currentIndex];
+    String currentQuestionId = currentQuestion['id']?.toString() ?? currentQuestion['question_text'].toString();
 
     return Scaffold(
       backgroundColor: const Color(0xffd2dad2),
@@ -167,7 +183,6 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
         foregroundColor: Colors.white,
         title: Text("Test Progress (${_currentIndex + 1}/${_questions.length})"),
         centerTitle: true,
-        automaticallyImplyLeading: false,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -193,10 +208,10 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
                       Expanded(
                         child: ListView(
                           children: [
-                            _buildOptionTile('A', currentQuestion['option_a'] ?? ''),
-                            _buildOptionTile('B', currentQuestion['option_b'] ?? ''),
-                            _buildOptionTile('C', currentQuestion['option_c'] ?? ''),
-                            _buildOptionTile('D', currentQuestion['option_d'] ?? ''),
+                            _buildOptionTile('A', currentQuestion['option_a'] ?? '', currentQuestionId),
+                            _buildOptionTile('B', currentQuestion['option_b'] ?? '', currentQuestionId),
+                            _buildOptionTile('C', currentQuestion['option_c'] ?? '', currentQuestionId),
+                            _buildOptionTile('D', currentQuestion['option_d'] ?? '', currentQuestionId),
                           ],
                         ),
                       ),
@@ -220,8 +235,8 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff0f766e)),
                   onPressed: () {
-                    if (!_selectedAnswers.containsKey(_currentIndex)) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pehle koi option select karein!")));
+                    if (!_selectedAnswers.containsKey(currentQuestionId)) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("First Select an option before proceeding.")));
                       return;
                     }
                     if (_currentIndex < _questions.length - 1) {
@@ -240,8 +255,8 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
     );
   }
 
-  Widget _buildOptionTile(String optionKey, String optionText) {
-    bool isSelected = _selectedAnswers[_currentIndex] == optionKey;
+  Widget _buildOptionTile(String optionKey, String optionText, String questionId) {
+    bool isSelected = _selectedAnswers[questionId] == optionKey;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
@@ -253,8 +268,8 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
         activeColor: const Color(0xff0f766e),
         title: Text(optionText),
         value: optionKey,
-        groupValue: _selectedAnswers[_currentIndex],
-        onChanged: (value) => setState(() => _selectedAnswers[_currentIndex] = value!),
+        groupValue: _selectedAnswers[questionId],
+        onChanged: (value) => setState(() => _selectedAnswers[questionId] = value!),
       ),
     );
   }
