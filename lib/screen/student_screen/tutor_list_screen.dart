@@ -108,6 +108,7 @@ class _TutorListScreenState extends State<TutorListScreen> {
                     String rates = makeDataSafe(tutor['rates']);
 
                     bool isOnline = tutor['is_online'] as bool? ?? false;
+                    double averageRating = (tutor['rating'] as num? ?? 0.0).toDouble();
 
                     return Padding(
                       padding: const EdgeInsets.only(top: 35.0, bottom: 12.0),
@@ -146,8 +147,25 @@ class _TutorListScreenState extends State<TutorListScreen> {
                                         style: const TextStyle(color: Colors.black45, fontSize: 12)
                                     ),
                                   ),
-                                  const SizedBox(height: 15),
+                                  const SizedBox(height: 5),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      ...List.generate(5, (starIndex) {
+                                        double starValue = starIndex + 1.0;
+                                        if (averageRating >= starValue) {
+                                          return const Icon(Icons.star, color: Colors.amber, size: 18);
+                                        } else if (averageRating >= starValue - 0.5) {
+                                          return const Icon(Icons.star_half, color: Colors.amber, size: 18);
+                                        } else {
+                                          return const Icon(Icons.star_border, color: Colors.grey, size: 18);
+                                        }
+                                      }),
 
+                                    ],
+                                  ),
+
+                                  SizedBox(height: 10,),
                                   Container(
                                     color: const Color(0xff0f766e),
                                     padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),

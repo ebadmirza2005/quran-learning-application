@@ -5,6 +5,7 @@ import '../utils/auth_field.dart';
 import '../utils/button.dart';
 import '../utils/gesture_detector_widget.dart';
 import '../utils/text.dart';
+import 'admin_screen.dart';
 import 'signup_student_screen.dart';
 import 'signup_tutor_screen.dart';
 import 'student_home_screen.dart';

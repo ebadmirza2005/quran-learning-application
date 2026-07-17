@@ -14,6 +14,10 @@ class StudentsScreen extends StatefulWidget {
 class _StudentsScreenState extends State<StudentsScreen> {
   final supabase = Supabase.instance.client;
 
+  // Shuffled data ko track karne ke liye variables
+  List<Map<String, dynamic>> _shuffledStudents = [];
+  String _lastDataIds = "";
+
   String makeDataSafe(dynamic rawData) {
     if (rawData == null) return '-';
     if (rawData is List) {
@@ -54,7 +58,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         body: StreamBuilder<List<Map<String, dynamic>>>(
             stream: supabase.from('students').stream(primaryKey: ['id']),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting){
+              if (snapshot.connectionState == ConnectionState.waiting && _shuffledStudents.isEmpty){
                 return const Center(
                   child: CircularProgressIndicator(color: Color(0xff0f766e)),
                 );
@@ -66,19 +70,29 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 );
               }
 
-              final students = snapshot.data ?? [];
+              final currentStudents = snapshot.data ?? [];
 
-              if (students.isEmpty) {
+              if (currentStudents.isEmpty) {
                 return const Center(
                   child: Text("No students found!"),
                 );
               }
+
+              // unique ID string bana kar check karte hain ke data sach me badla hai ya nahi
+              // Taake har minor rebuild par list random shuffle ho kar glitch na kare
+              String currentDataIds = currentStudents.map((e) => e['id']).join(',');
+              if (_lastDataIds != currentDataIds) {
+                _lastDataIds = currentDataIds;
+                _shuffledStudents = List<Map<String, dynamic>>.from(currentStudents);
+                _shuffledStudents.shuffle(); // Har naye tutor ke device par uniquely shuffle hoga
+              }
+
               return ListView.builder(
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.only(left: 12, right: 12, top: 20, bottom: 12),
-                  itemCount: students.length,
+                  itemCount: _shuffledStudents.length,
                   itemBuilder: (context, index) {
-                    final student = students[index];
+                    final student = _shuffledStudents[index];
 
                     String studentName = student['name'] ?? 'No Name';
                     String location = student['city'] ?? 'Unknown Location';
