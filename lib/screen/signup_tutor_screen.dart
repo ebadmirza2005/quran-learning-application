@@ -1,7 +1,7 @@
 import 'package:country_picker/country_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter/material.dart';
 import '../utils/auth_field.dart';
 import '../utils/text.dart';
 import 'tutor_home_screen.dart';
@@ -71,7 +71,7 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
           .map((entry) => entry.key)
           .toList();
 
-      // 1. Supabase Auth SignUp Call (Bina custom metadata data pass kiye simple rakhein)
+      // 1. Direct Supabase Auth Sign Up
       final authResponse = await _supabase.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -84,30 +84,35 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
       final user = authResponse.user;
 
       if (user != null) {
+        // 2. Direct database entry in 'tutors' table
+        await _supabase.from('tutors').insert({
+          'id': user.id,
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'gender': selectedValue,
+          'phone': _phoneController.text.trim(),
+          'country': _selectedCountry,
+          'city': _cityController.text.trim(),
+          'timezone': _selectedTimeZone,
+          'skills': selectedSkills,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
         if (!mounted) return;
 
-        // 2. Direct OTP Screen par le jayein aur baqi ka data transfer kar dein taake verify hone par save ho
+        _showSnackBar("Account created successfully!");
+
+        // 3. Direct navigate to TutorHomeScreen
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(
-            builder: (_) => OtpVerificationScreen(
-              email: _emailController.text.trim(),
-              name: _nameController.text.trim(),
-              gender: selectedValue,
-              phone: _phoneController.text.trim(),
-              country: _selectedCountry,
-              city: _cityController.text.trim(),
-              timezone: _selectedTimeZone,
-              skills: selectedSkills,
-            ),
-          ),
+          MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
               (Route route) => false,
         );
       }
     } on AuthException catch (e) {
       _showSnackBar(e.message);
     } catch (e) {
-      debugPrint("Signup error detail: $e"); // Terminal me check karne ke liye
+      debugPrint("Signup error detail: $e");
       _showSnackBar("An unexpected error occurred: ${e.toString()}");
     } finally {
       if (mounted) {
@@ -157,12 +162,17 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
         _availableTimeZones = ["Select Timezone", ...matchedZones];
         _selectedTimeZone = "Select Timezone";
       } else {
-        if (code == "PK") _availableTimeZones = ["Select Timezone", "Asia/Karachi"];
-        else if (code == "IN") _availableTimeZones = ["Select Timezone", "Asia/Kolkata"];
-        else if (code == "SA") _availableTimeZones = ["Select Timezone", "Asia/Riyadh"];
-        else if (code == "AE") _availableTimeZones = ["Select Timezone", "Asia/Dubai"];
-        else if (code == "GB") _availableTimeZones = ["Select Timezone", "Europe/London"];
-        else {
+        if (code == "PK") {
+          _availableTimeZones = ["Select Timezone", "Asia/Karachi"];
+        } else if (code == "IN") {
+          _availableTimeZones = ["Select Timezone", "Asia/Kolkata"];
+        } else if (code == "SA") {
+          _availableTimeZones = ["Select Timezone", "Asia/Riyadh"];
+        } else if (code == "AE") {
+          _availableTimeZones = ["Select Timezone", "Asia/Dubai"];
+        } else if (code == "GB") {
+          _availableTimeZones = ["Select Timezone", "Europe/London"];
+        } else {
           _availableTimeZones = [
             "Select Timezone",
             "GMT +${country.phoneCode} (Standard Time)",
@@ -252,9 +262,19 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                 width: MediaQuery.of(context).size.width * 0.85,
                 child: Row(
                   children: [
-                    Expanded(child: AuthField(authFieldText: "Password", controller: _passwordController)),
+                    Expanded(
+                      child: AuthField(
+                        authFieldText: "Password",
+                        controller: _passwordController,
+                      ),
+                    ),
                     const SizedBox(width: 5),
-                    Expanded(child: AuthField(authFieldText: "Re-Type Password", controller: _confirmPasswordController)),
+                    Expanded(
+                      child: AuthField(
+                        authFieldText: "Re-Type Password",
+                        controller: _confirmPasswordController,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -268,7 +288,8 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                       context: context,
                       onSelect: (Country country) {
                         setState(() {
-                          _selectedCountry = "${country.name} (${country.countryCode}) ${country.flagEmoji}";
+                          _selectedCountry =
+                          "${country.name} (${country.countryCode}) ${country.flagEmoji}";
                         });
                         _loadTimeZone(country);
                       },
@@ -358,7 +379,6 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                       textWeight: FontWeight.bold,
                     ),
                     const SizedBox(height: 5),
-
                     for (int i = 0; i < skillsKeys.length; i += 2) ...[
                       Row(
                         children: [
@@ -410,11 +430,9 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: _signUpTutor,
+                  onPressed: _isLoading ? null : _signUpTutor,
                   child: _isLoading
-                      ? const CircularProgressIndicator(
-                      color: Colors.white
-                  )
+                      ? const CircularProgressIndicator(color: Colors.white)
                       : const Text(
                     "Sign Up",
                     style: TextStyle(
@@ -447,201 +465,6 @@ class _SignupTutorScreenState extends State<SignupTutorScreen> {
         ),
         Flexible(child: TextWidget(text: skillName)),
       ],
-    );
-  }
-}
-
-// ==========================================
-// UPDATED & SECURE OTP VERIFICATION SCREEN
-// ==========================================
-class OtpVerificationScreen extends StatefulWidget {
-  final String email;
-  final String name;
-  final String gender;
-  final String phone;
-  final String country;
-  final String city;
-  final String timezone;
-  final List<String> skills;
-
-  const OtpVerificationScreen({
-    super.key,
-    required this.email,
-    required this.name,
-    required this.gender,
-    required this.phone,
-    required this.country,
-    required this.city,
-    required this.timezone,
-    required this.skills,
-  });
-
-  @override
-  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
-}
-
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  final _otpController = TextEditingController();
-  final _supabase = Supabase.instance.client;
-  bool _isLoading = false;
-
-  Future<void> _verifyOTP() async {
-    final otpCode = _otpController.text.trim();
-    if (otpCode.isEmpty || otpCode.length < 6) {
-      _showSnackBar("Please enter a valid 6-digit OTP code.");
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // 1. OTP verify karein
-      final response = await _supabase.auth.verifyOTP(
-        email: widget.email,
-        token: otpCode,
-        type: OtpType.signup,
-      );
-
-      if (response.user != null) {
-        final userId = response.user!.id;
-
-        // 2. OTP successfully verify hone ke baad data public table me insert karein
-        try {
-          await _supabase.from('tutors').insert({
-            'id': userId,
-            'name': widget.name,
-            'email': widget.email,
-            'gender': widget.gender,
-            'phone': widget.phone,
-            'country': widget.country,
-            'city': widget.city,
-            'timezone': widget.timezone,
-            'skills': widget.skills,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        } catch (dbError) {
-          // Agar RLS ya database structure ka koi error aaye to trace ho sake
-          debugPrint("Database Insertion Error: $dbError");
-        }
-
-        _showSnackBar("Account verified successfully!");
-
-        if (!mounted) return;
-
-        // 3. Complete entry hone ke baad home screen par navigate karein
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const TutorHomeScreen()),
-              (Route route) => false,
-        );
-      }
-    } on AuthException catch (e) {
-      _showSnackBar(e.message);
-    } catch (e) {
-      debugPrint("OTP Verification unexpected error: $e");
-      _showSnackBar("An unexpected error occurred: ${e.toString()}");
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  void dispose() {
-    _otpController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xffd2dad2),
-      appBar: AppBar(
-        title: const Text("Enter Verification Code"),
-        backgroundColor: const Color(0xff0f766e),
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.security_rounded,
-                size: 80,
-                color: Color(0xff0f766e),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                "We have sent a 6-digit OTP code to your email\n${widget.email}.",
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16, color: Colors.black87),
-              ),
-              const SizedBox(height: 30),
-
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.85,
-                child: TextField(
-                  controller: _otpController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 24,
-                      letterSpacing: 8,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black
-                  ),
-                  decoration: InputDecoration(
-                    hintText: "000000",
-                    hintStyle: const TextStyle(color: Colors.grey, letterSpacing: 8),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    counterText: "",
-                  ),
-                ),
-              ),
-              const SizedBox(height: 35),
-              SizedBox(
-                width: MediaQuery.of(context).size.width * 0.85,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xff0f766e),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: _isLoading ? null : _verifyOTP,
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                    "Verify & Login",
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

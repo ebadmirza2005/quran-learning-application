@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/text.dart';
 import '../teacher_screen/tutor_chat_screen.dart';
+import 'tutor_complete_details.dart';
 
 class TutorListScreen extends StatefulWidget {
   const TutorListScreen({super.key});
@@ -69,7 +70,7 @@ class _TutorListScreenState extends State<TutorListScreen> {
           centerTitle: true,
         ),
         body: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: supabase.from('tutors').stream(primaryKey: ['id']),
+            stream: supabase.from('tutors').stream(primaryKey: ['id']).eq('verification_status', 'verified'),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting){
                 return const Center(
@@ -83,7 +84,9 @@ class _TutorListScreenState extends State<TutorListScreen> {
                 );
               }
 
-              final tutors = snapshot.data ?? [];
+              final tutors = (snapshot.data ?? []).where((t) {
+                return t['verification_status'] == 'verified';
+              }).toList();
 
               if (tutors.isEmpty) {
                 return const Center(
@@ -116,74 +119,79 @@ class _TutorListScreenState extends State<TutorListScreen> {
                         clipBehavior: Clip.none,
                         alignment: Alignment.topCenter,
                         children: [
-                          Card(
-                            margin: EdgeInsets.zero,
-                            clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 2,
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  const SizedBox(height: 35),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => TutorCompleteDetails(tutorId: tutor['id'] ?? '')));
+                            },
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              clipBehavior: Clip.antiAlias,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    const SizedBox(height: 35),
 
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                                    child: Text(
-                                      tutorName,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                                    child: Text(
-                                        "$location, $country",
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                                      child: Text(
+                                        tutorName,
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(color: Colors.black45, fontSize: 12)
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      ...List.generate(5, (starIndex) {
-                                        double starValue = starIndex + 1.0;
-                                        if (averageRating >= starValue) {
-                                          return const Icon(Icons.star, color: Colors.amber, size: 18);
-                                        } else if (averageRating >= starValue - 0.5) {
-                                          return const Icon(Icons.star_half, color: Colors.amber, size: 18);
-                                        } else {
-                                          return const Icon(Icons.star_border, color: Colors.grey, size: 18);
-                                        }
-                                      }),
-
-                                    ],
-                                  ),
-
-                                  SizedBox(height: 10,),
-                                  Container(
-                                    color: const Color(0xff0f766e),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
-                                    child: Column(
+                                    const SizedBox(height: 4),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                                      child: Text(
+                                          "$location, $country",
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(color: Colors.black45, fontSize: 12)
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        _buildDataRow("Gender", gender,),
-                                        _buildDataRow("Languages", languages),
-                                        _buildDataRow("Expertise", skillsDisplay),
-                                        _buildDataRow("Rates", rates),
-                                        _buildDataRow(
-                                          "Online",
-                                          isOnline ? "Yes" : "No",
-                                          valueColor: isOnline ? Colors.greenAccent : Colors.white60,
-                                        ),
+                                        ...List.generate(5, (starIndex) {
+                                          double starValue = starIndex + 1.0;
+                                          if (averageRating >= starValue) {
+                                            return const Icon(Icons.star, color: Colors.amber, size: 18);
+                                          } else if (averageRating >= starValue - 0.5) {
+                                            return const Icon(Icons.star_half, color: Colors.amber, size: 18);
+                                          } else {
+                                            return const Icon(Icons.star_border, color: Colors.grey, size: 18);
+                                          }
+                                        }),
+
                                       ],
                                     ),
-                                  ),
-                                ],
+
+                                    SizedBox(height: 10,),
+                                    Container(
+                                      color: const Color(0xff0f766e),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+                                      child: Column(
+                                        children: [
+                                          _buildDataRow("Gender", gender,),
+                                          _buildDataRow("Languages", languages),
+                                          _buildDataRow("Expertise", skillsDisplay),
+                                          _buildDataRow("Rates", rates),
+                                          _buildDataRow(
+                                            "Online",
+                                            isOnline ? "Yes" : "No",
+                                            valueColor: isOnline ? Colors.greenAccent : Colors.white60,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),

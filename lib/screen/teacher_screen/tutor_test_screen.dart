@@ -18,7 +18,6 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
   bool _isLoading = true;
   int _currentIndex = 0;
 
-  // Map key ko String (Question ID) banaya hai taake random hone par answers mix na hon
   final Map<String, String> _selectedAnswers = {};
 
   @override
@@ -34,7 +33,6 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
       setState(() {
         List<Map<String, dynamic>> fetchedQuestions = List<Map<String, dynamic>>.from(response);
 
-        // 🌟 Yahan hum list ko randomly shuffle kar rahe hain
         fetchedQuestions.shuffle();
 
         _questions = fetchedQuestions;
@@ -58,7 +56,6 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
     int correctCount = 0;
     for (int i = 0; i < _questions.length; i++) {
       final question = _questions[i];
-      // Hum database se ID ya unique text uthayenge key ke taur par
       String questionId = question['id']?.toString() ?? question['question_text'].toString();
 
       String correctAnswer = question['correct_option'].toString().trim().toUpperCase();
@@ -69,7 +66,6 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
       }
     }
 
-    bool isPassed = correctCount >= 8;
     String currentTutorId = supabase.auth.currentUser!.id;
 
     setState(() {
@@ -79,47 +75,60 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
     try {
       await supabase.from('tutors').update({
         'last_test_attempt': DateTime.now().toIso8601String(),
+        'test_score': correctCount,
+        'verification_status': 'pending',
       }).eq('id', currentTutorId);
 
-      if (isPassed) {
-        await supabase.from('tutors').update({
-          'rating': 5.0,
-        }).eq('id', currentTutorId);
+      if (mounted) {
+        _showReviewPendingDialog(
+          title: "Test Submitted Successfully! ⏳",
+          message: "Your test has been submitted. Your results are currently under review and will be updated within 12 hours.",
+        );
 
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TutorHomeScreen()));
-
-        _showResultDialog(title: "Congratulations! 🎉", message: "You have passed the test.", isSuccess: true);
-      } else {
-        _showResultDialog(title: "Test Failed ❌", message: "You have not passed the test. Try again after 24 hours.", isSuccess: false);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error Updating Results: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error Submitting Test: $e")),
+        );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  void _showResultDialog({required String title, required String message, required bool isSuccess}) {
+  void _showReviewPendingDialog({required String title, required String message}) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: Text(message, textAlign: TextAlign.center),
+        title: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
         actions: [
           Center(
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff0f766e)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff0f766e),
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+              ),
               onPressed: () {
-                Navigator.pop(context); // Dialog band
-                Navigator.pushReplacementNamed(context, '/tutor_dashboard_wrapper');
+                Navigator.pop(context);
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
               },
-              child: const Text("OK", style: TextStyle(color: Colors.white)),
+              child: const Text("Got It", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           )
         ],
@@ -203,7 +212,10 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(currentQuestion['question_text'] ?? '', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xff0f766e))),
+                      Text(
+                        currentQuestion['question_text'] ?? '',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xff0f766e)),
+                      ),
                       const SizedBox(height: 20),
                       Expanded(
                         child: ListView(
@@ -236,7 +248,9 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff0f766e)),
                   onPressed: () {
                     if (!_selectedAnswers.containsKey(currentQuestionId)) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("First Select an option before proceeding.")));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("First select an option before proceeding.")),
+                      );
                       return;
                     }
                     if (_currentIndex < _questions.length - 1) {
@@ -245,7 +259,10 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
                       _submitTest();
                     }
                   },
-                  child: Text(_currentIndex == _questions.length - 1 ? "Submit Test" : "Next", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    _currentIndex == _questions.length - 1 ? "Submit Test" : "Next",
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),

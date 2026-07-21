@@ -2,14 +2,14 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart'; // Safe media picker video ke liye
+import 'package:image_picker/image_picker.dart'; // Gallery Picker
 import 'package:permission_handler/permission_handler.dart';
 import 'package:quran_learning_application/utils/text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../tutor_home_screen.dart';
 
-// Safe Global Lock: Multiple native threads ko overlap hone se bachata hai
+// Safe Global Lock: Prevents multiple native threads from overlapping
 bool _globalFilePickerLock = false;
 
 class TutorEditInfo extends StatefulWidget {
@@ -85,7 +85,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
   Future<bool> _checkPermission() async {
     if (!Platform.isAndroid) return true;
 
-    // Android 13+ par Permission.audio check karega, purane devices par storage permission
     if (await Permission.audio.isGranted || await Permission.storage.isGranted) {
       return true;
     }
@@ -107,7 +106,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
 
     bool hasPermission = await _checkPermission();
     if (!hasPermission) {
-      _showSnackBar("Audio files select karne ke liye permission zaroori hai!", Colors.orange);
+      _showSnackBar("Permission is required to select audio files!", Colors.orange);
       return;
     }
 
@@ -115,11 +114,9 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
       _globalFilePickerLock = true;
     });
 
-    // Device framework cooldown delay
     await Future.delayed(const Duration(milliseconds: 250));
 
     try {
-      // Custom extensions ke zariye Android native file-explorer ko target kar rahe hain
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg'],
@@ -134,7 +131,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
       }
     } on PlatformException catch (platErr) {
       debugPrint("Main picker failed on Android thread: ${platErr.message}");
-      // Fallback dynamic file selection (In case file picker channel blocks)
       try {
         FilePickerResult? fallbackResult = await FilePicker.platform.pickFiles(
           type: FileType.any,
@@ -169,7 +165,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
 
     bool hasPermission = await _checkPermission();
     if (!hasPermission) {
-      _showSnackBar("Video select karne ke liye permission zaroori hai!", Colors.orange);
+      _showSnackBar("Permission is required to select videos!", Colors.orange);
       return;
     }
 
@@ -180,7 +176,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     await Future.delayed(const Duration(milliseconds: 250));
 
     try {
-      // ImagePicker gallery videos picking ke liye highly optimized aur bug-free hai
       final ImagePicker picker = ImagePicker();
       final XFile? video = await picker.pickVideo(
         source: ImageSource.gallery,
@@ -207,60 +202,234 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
 
   void _showAddEmploymentDialog() {
     final companyController = TextEditingController();
-    final roleController = TextEditingController();
-    final durationController = TextEditingController();
+
+    DateTime? startDate;
+    DateTime? endDate;
+    bool isCurrentlyWorking = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("Add Employment", style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: companyController,
-                decoration: const InputDecoration(labelText: "Organization / School", hintText: "e.g. Al-Azhar Institute"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: roleController,
-                decoration: const InputDecoration(labelText: "Role / Designation", hintText: "e.g. Quran Teacher"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: durationController,
-                decoration: const InputDecoration(labelText: "Duration", hintText: "e.g. 2022 - 2024"),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (companyController.text.isNotEmpty && roleController.text.isNotEmpty) {
-                setState(() {
-                  _employments.add({
-                    "company": companyController.text.trim(),
-                    "role": roleController.text.trim(),
-                    "duration": durationController.text.trim(),
-                  });
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> selectDate(BuildContext context, bool isStart) async {
+              final DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(1970),
+                lastDate: DateTime.now(),
+                builder: (context, child) {
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: const ColorScheme.light(
+                        primary: Color(0xff0f766e),
+                      ),
+                    ),
+                    child: child!,
+                  );
+                },
+              );
+
+              if (picked != null) {
+                setDialogState(() {
+                  if (isStart) {
+                    startDate = picked;
+                    if (endDate != null && startDate!.isAfter(endDate!)) {
+                      endDate = null;
+                    }
+                  } else {
+                    endDate = picked;
+                  }
                 });
-                Navigator.pop(context);
-              } else {
-                _showSnackBar("Organization aur Role zaroori hain!", Colors.redAccent);
               }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff0f766e)),
-            child: const Text("Add", style: TextStyle(color: Colors.white)),
-          )
-        ],
-      ),
+            }
+
+            String formatDate(DateTime? date) {
+              if (date == null) return "Select Date";
+              return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text("Add Employment", style: TextStyle(fontWeight: FontWeight.bold)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: companyController,
+                      decoration: const InputDecoration(
+                        labelText: "Employer Name *",
+                        hintText: "e.g. Al-Azhar Institute",
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "From Date *",
+                                style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 6),
+                              InkWell(
+                                onTap: () => selectDate(context, true),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade400),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          formatDate(startDate),
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: startDate == null ? Colors.grey : Colors.black87,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const Icon(Icons.calendar_today, size: 16, color: Color(0xff0f766e)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        if (!isCurrentlyWorking) ...[
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "To Date *",
+                                  style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 6),
+                                InkWell(
+                                  onTap: () => selectDate(context, false),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey.shade400),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            formatDate(endDate),
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: endDate == null ? Colors.grey : Colors.black87,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const Icon(Icons.calendar_today, size: 16, color: Color(0xff0f766e)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isCurrentlyWorking,
+                          activeColor: const Color(0xff0f766e),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              isCurrentlyWorking = val ?? false;
+                              if (isCurrentlyWorking) {
+                                endDate = null;
+                              }
+                            });
+                          },
+                        ),
+                        const Text(
+                          "I currently work here (Present)",
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (companyController.text.trim().isEmpty) {
+                      _showSnackBar("Employer Name is required!", Colors.redAccent);
+                      return;
+                    }
+                    if (startDate == null) {
+                      _showSnackBar("Please select From Date!", Colors.redAccent);
+                      return;
+                    }
+                    if (!isCurrentlyWorking && endDate == null) {
+                      _showSnackBar("Please select To Date or check 'Present'!", Colors.redAccent);
+                      return;
+                    }
+
+                    const List<String> monthNames = [
+                      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+                    ];
+
+                    // Day + Month Name + Year
+                    String fromStr = "${startDate!.day} ${monthNames[startDate!.month - 1]} ${startDate!.year}";
+                    String toStr = isCurrentlyWorking
+                        ? "Present"
+                        : "${endDate!.day} ${monthNames[endDate!.month - 1]} ${endDate!.year}";
+
+                    String durationStr = "$fromStr - $toStr";
+
+                    setState(() {
+                      _employments.add({
+                        "company": companyController.text.trim(),
+                        "duration": durationStr,
+                        "start_date": startDate!.toIso8601String(),
+                        "end_date": isCurrentlyWorking ? null : endDate?.toIso8601String(),
+                        "is_present": isCurrentlyWorking,
+                      });
+                    });
+
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff0f766e)),
+                  child: const Text("Add", style: TextStyle(color: Colors.white)),
+                )
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -268,59 +437,145 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     final titleController = TextEditingController();
     final issuerController = TextEditingController();
     final yearController = TextEditingController();
+    File? certImage;
+    final detailsController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("Add Certificate / Ijazah", style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(labelText: "Certificate Title", hintText: "e.g. Ijazah in Tajweed"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: issuerController,
-                decoration: const InputDecoration(labelText: "Issued By", hintText: "e.g. Wifaq-ul-Madaris"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: yearController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Year of Passing", hintText: "e.g. 2023"),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (titleController.text.isNotEmpty && issuerController.text.isNotEmpty) {
-                setState(() {
-                  _certifications.add({
-                    "title": titleController.text.trim(),
-                    "issuer": issuerController.text.trim(),
-                    "year": yearController.text.trim(),
-                  });
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> pickCertImage() async {
+              final ImagePicker picker = ImagePicker();
+              final XFile? image = await picker.pickImage(
+                source: ImageSource.gallery,
+                imageQuality: 85,
+              );
+              if (image != null) {
+                setDialogState(() {
+                  certImage = File(image.path);
                 });
-                Navigator.pop(context);
-              } else {
-                _showSnackBar("Title aur Issuer zaroori hain!", Colors.redAccent);
               }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff0f766e)),
-            child: const Text("Add", style: TextStyle(color: Colors.white)),
-          )
-        ],
-      ),
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text("Add Certificate / Ijazah", style: TextStyle(fontWeight: FontWeight.bold)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(
+                        labelText: "Title",
+                        hintText: "e.g. Ijazah in Tajweed",
+                        border: OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xff0f766e)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: issuerController,
+                      decoration: const InputDecoration(
+                        labelText: "Issued By",
+                        hintText: "e.g. Faaz-Al-Quran",
+                        border: OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xff0f766e)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: yearController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Year of Passing",
+                        hintText: "e.g. 2026",
+                        border: OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xff0f766e)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    InkWell(
+                      onTap: pickCertImage,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        height: 110,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: certImage != null
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(certImage!, fit: BoxFit.cover),
+                        )
+                            : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_a_photo_outlined, color: Color(0xff0f766e), size: 30),
+                            SizedBox(height: 6),
+                            Text("Select Certificate Image", style: TextStyle(fontSize: 12, color: Colors.black54)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    TextField(
+                      controller: detailsController,
+                      minLines: 3,
+                      maxLines: null,
+                      decoration: const InputDecoration(
+                        labelText: "Details",
+                        hintText: "Enter details here...",
+                        border: OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xff0f766e)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (titleController.text.isNotEmpty && issuerController.text.isNotEmpty) {
+                      setState(() {
+                        _certifications.add({
+                          "title": titleController.text.trim(),
+                          "issuer": issuerController.text.trim(),
+                          "year": yearController.text.trim(),
+                          "local_image": certImage,
+                          "details": detailsController.text.trim()
+                        });
+                      });
+                      Navigator.pop(context);
+                    } else {
+                      _showSnackBar("Title and Issuer are required!", Colors.redAccent);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff0f766e)),
+                  child: const Text("Add", style: TextStyle(color: Colors.white)),
+                )
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -346,7 +601,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
   Future<void> _saveChangesToSupabase() async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
-      _showSnackBar("User logged in nahi hai!", Colors.red);
+      _showSnackBar("User is not logged in!", Colors.red);
       return;
     }
 
@@ -366,10 +621,29 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         videoUrl = await _uploadFileToBucket(_selectedVideoFile!, _videoFileName!, 'videos');
       }
 
+      List<Map<String, dynamic>> processedCertifications = [];
+      for (var cert in _certifications) {
+        Map<String, dynamic> certMap = Map<String, dynamic>.from(cert);
+
+        if (certMap['local_image'] != null && certMap['local_image'] is File) {
+          File localImg = certMap['local_image'];
+          String? imgUrl = await _uploadFileToBucket(
+            localImg,
+            'cert_${DateTime.now().millisecondsSinceEpoch}.jpg',
+            'certifications',
+          );
+          if (imgUrl != null) {
+            certMap['certificate_image'] = imgUrl;
+          }
+        }
+        certMap.remove('local_image');
+        processedCertifications.add(certMap);
+      }
+
       final Map<String, dynamic> updateData = {
         'hourly_rate': double.tryParse(_hourlyRateController.text) ?? 0.0,
         'employments': _employments,
-        'certifications': _certifications,
+        'certifications': processedCertifications,
       };
 
       if (audioUrl != null) {
@@ -384,7 +658,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
           .update(updateData)
           .eq('id', user.id);
 
-      _showSnackBar("Profile successfully updated! 🎉", Colors.green);
+      _showSnackBar("Profile successfully updated! 🎉", Color(0xff0f766e));
 
       setState(() {
         _selectedAudioFile = null;
@@ -399,7 +673,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
 
     } catch (e) {
       debugPrint("Database Update Error: $e");
-      _showSnackBar("Save fails: $e", Colors.redAccent);
+      _showSnackBar("Save failed: $e", Colors.redAccent);
     } finally {
       if (mounted) {
         setState(() {
@@ -591,7 +865,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                         itemBuilder: (context, index) {
                           final item = _employments[index];
                           return ListTile(
-                            title: Text("${item['role']} at ${item['company']}", style: const TextStyle(fontWeight: FontWeight.w600)),
+                            title: Text(item['company'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
                             subtitle: Text(item['duration'] ?? ''),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline, color: Colors.red),
@@ -646,7 +920,34 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                         itemCount: _certifications.length,
                         itemBuilder: (context, index) {
                           final item = _certifications[index];
+                          final String? imgUrl = item['certificate_image'];
+                          final File? localFile = item['local_image'];
+
                           return ListTile(
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: localFile != null
+                                  ? Image.file(localFile, width: 45, height: 45, fit: BoxFit.cover)
+                                  : (imgUrl != null && imgUrl.isNotEmpty)
+                                  ? GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => Dialog(
+                                      child: Image.network(imgUrl, fit: BoxFit.contain),
+                                    ),
+                                  );
+                                },
+                                child: Image.network(
+                                  imgUrl,
+                                  width: 45,
+                                  height: 45,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) => const Icon(Icons.card_membership, size: 35),
+                                ),
+                              )
+                                  : const Icon(Icons.card_membership, size: 35, color: Color(0xff0f766e)),
+                            ),
                             title: Text(item['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
                             subtitle: Text("By ${item['issuer']} (${item['year']})"),
                             trailing: IconButton(
