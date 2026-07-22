@@ -35,45 +35,57 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Future<void> _fetchTutorData() async {
     try {
       final user = supabase.auth.currentUser;
-      if (user != null) {
-        final data = await supabase
-            .from('tutors')
-            .select()
-            .eq('id', user.id)
-            .maybeSingle();
-
-        if (data != null) {
-          String status = (data['verification_status'] ?? 'unverified').toString();
-
-          // Profile completion calculation
-          _calculateProfileCompletion(data);
-
+      if (user == null) {
+        if (mounted) {
           setState(() {
-            _verificationStatus = status;
+            _isLoadingStatus = false;
           });
+        }
+        return;
+      }
 
-          final prefs = await SharedPreferences.getInstance();
+      final data = await supabase
+          .from('tutors')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
 
-          if (status == 'verified' && mounted) {
-            bool hasShownVerifiedPopup = prefs.getBool('has_shown_verified_dialog_${user.id}') ?? false;
-            if (!hasShownVerifiedPopup) {
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (data != null && mounted) {
+        String status = (data['verification_status'] ?? 'unverified').toString();
+
+        // Profile completion calculation
+        _calculateProfileCompletion(data);
+
+        setState(() {
+          _verificationStatus = status;
+        });
+
+        final prefs = await SharedPreferences.getInstance();
+
+        if (status == 'verified' && mounted) {
+          bool hasShownVerifiedPopup = prefs.getBool('has_shown_verified_dialog_${user.id}') ?? false;
+          if (!hasShownVerifiedPopup) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (mounted) {
                 _showVerifiedDialog(context);
                 await prefs.setBool('has_shown_verified_dialog_${user.id}', true);
-              });
-            }
+              }
+            });
           }
-          else if (status == 'failed' && mounted) {
-            bool hasShownFailedPopup = prefs.getBool('has_shown_failed_dialog_${user.id}') ?? false;
-            if (!hasShownFailedPopup) {
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
+        } else if (status == 'failed' && mounted) {
+          bool hasShownFailedPopup = prefs.getBool('has_shown_failed_dialog_${user.id}') ?? false;
+          if (!hasShownFailedPopup) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (mounted) {
                 _showFailedDialog(context);
                 await prefs.setBool('has_shown_failed_dialog_${user.id}', true);
-              });
-            }
+              }
+            });
           }
         }
       }
+    } on AuthException catch (e) {
+      debugPrint("Supabase Auth Error: ${e.message}");
     } catch (e) {
       debugPrint("Error fetching tutor data: $e");
     } finally {
@@ -125,10 +137,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       missing.add("Audio/Video Sample");
     }
 
-    setState(() {
-      _profileCompletionPercentage = completedSteps / totalSteps;
-      _missingProfileFields = missing;
-    });
+    if (mounted) {
+      setState(() {
+        _profileCompletionPercentage = completedSteps / totalSteps;
+        _missingProfileFields = missing;
+      });
+    }
   }
 
   void _showVerifiedDialog(BuildContext context) {
@@ -324,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               controller: tabController,
               children: const [
                 Center(child: Text("No Students Found!")),
-                Center(child: Text("No Invitation Found!")),
+                InvitesTabWidget(),
               ],
             ),
           ),
@@ -405,11 +419,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.remove('has_shown_failed_dialog_${user.id}');
               }
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TutorTestScreen()),
-              );
-              _fetchTutorData();
+              if (mounted) {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TutorTestScreen()),
+                );
+                _fetchTutorData();
+              }
             },
           ),
           const SizedBox(height: 14),
@@ -440,5 +456,236 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ],
       );
     }
+  }
+}
+
+// Dynamic Invites Tab Widget using FutureBuilder
+class InvitesTabWidget extends StatefulWidget {
+  const InvitesTabWidget({super.key});
+
+  @override
+  State<InvitesTabWidget> createState() => _InvitesTabWidgetState();
+}
+
+class _InvitesTabWidgetState extends State<InvitesTabWidget> {
+  late Future<List<Map<String, dynamic>>> _invitesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInvites();
+  }
+
+  void _loadInvites() {
+    final tutorId = Supabase.instance.client.auth.currentUser?.id;
+    if (tutorId != null) {
+      _invitesFuture = Supabase.instance.client
+          .from('invites')
+          .select()
+          .eq('tutor_id', tutorId)
+          .order('created_at', ascending: false);
+    } else {
+      _invitesFuture = Future.value([]);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tutorId = Supabase.instance.client.auth.currentUser?.id;
+
+    if (tutorId == null) {
+      return const Center(child: Text("User not logged in."));
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _invitesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xff0f766e)),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              "Error loading invites: ${snapshot.error}",
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final invites = snapshot.data ?? [];
+
+        if (invites.isEmpty) {
+          return const Center(
+            child: Text(
+              "No Invitation Found!",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            if (mounted) {
+              setState(() {
+                _loadInvites();
+              });
+            }
+          },
+          color: const Color(0xff0f766e),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: invites.length,
+            itemBuilder: (context, index) {
+              final invite = invites[index];
+              final List<dynamic> skills = invite['selected_skills'] ?? [];
+              final String duration = invite['duration'] ?? 'N/A';
+              final String status = invite['status'] ?? 'pending';
+              final double rate = (invite['hourly_rate'] as num? ?? 0.0).toDouble();
+
+              return Card(
+                color: Colors.white,
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(14.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Duration: $duration",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Color(0xff0f766e),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: status == 'pending'
+                                  ? Colors.orange.withOpacity(0.15)
+                                  : status == 'accepted'
+                                  ? Colors.green.withOpacity(0.15)
+                                  : Colors.red.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              status.toUpperCase(),
+                              style: TextStyle(
+                                color: status == 'pending'
+                                    ? Colors.orange.shade800
+                                    : status == 'accepted'
+                                    ? Colors.green.shade800
+                                    : Colors.red.shade800,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: "Skills: ",
+                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                            ),
+                            TextSpan(
+                              text: skills.isNotEmpty ? skills.join(', ') : 'None',
+                              style: const TextStyle(color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: "Rate: ",
+                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                            ),
+                            TextSpan(
+                              text: "\$$rate / hour",
+                              style: const TextStyle(color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (status == 'pending') ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.red),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: () async {
+                                try {
+                                  await Supabase.instance.client
+                                      .from('invites')
+                                      .update({'status': 'rejected'})
+                                      .eq('id', invite['id']);
+                                  if (mounted) {
+                                    setState(() {
+                                      _loadInvites();
+                                    });
+                                  }
+                                } catch (e) {
+                                  debugPrint("Reject error: $e");
+                                }
+                              },
+                              child: const Text("Reject", style: TextStyle(color: Colors.red)),
+                            ),
+                            const SizedBox(width: 10),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xff0f766e),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: () async {
+                                try {
+                                  await Supabase.instance.client
+                                      .from('invites')
+                                      .update({'status': 'accepted'})
+                                      .eq('id', invite['id']);
+                                  if (mounted) {
+                                    setState(() {
+                                      _loadInvites();
+                                    });
+                                  }
+                                } catch (e) {
+                                  debugPrint("Accept error: $e");
+                                }
+                              },
+                              child: const Text("Accept", style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 }

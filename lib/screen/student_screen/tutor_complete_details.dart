@@ -7,7 +7,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import '../../utils/button.dart';
+import '../../utils/drop_down_widget.dart';
 import '../../utils/text.dart';
+import 'package:intl/intl.dart';
+
+import '../student_home_screen.dart';
+import '../tutor_home_screen.dart';
 
 class TutorCompleteDetails extends StatefulWidget {
   final String tutorId;
@@ -22,6 +27,11 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
   List<Map<String, dynamic>> _certifications = [];
   List<Map<String, dynamic>> _employments = [];
 
+  List<String> _tutorSkills = [];
+  Map<String, bool> selectedSkills = {};
+
+  String selectedDuration = "30 Minutes";
+
   String makeDataSafe(dynamic rawData) {
     if (rawData == null) return '-';
     if (rawData is List) {
@@ -31,7 +41,11 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     return str.isNotEmpty ? str : '-';
   }
 
-  // Helper method to format date string to "MMM YYYY"
+  String _currentTutorName = '';
+  double _hourlyRate = 0.00;
+
+
+
   String _formatDateString(String? rawDate) {
     if (rawDate == null || rawDate.trim().isEmpty) return '';
     try {
@@ -46,7 +60,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     }
   }
 
-  // Helper method to construct image URL dynamically
   String? _getValidImageUrl(Map<String, dynamic> item) {
     dynamic rawUrl = item['image_url'] ??
         item['certificate_image'] ??
@@ -70,7 +83,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     }
   }
 
-  // Dialog to view full certificate image
   void _showCertificateImageDialog(String imageUrl, String title) {
     showDialog(
       context: context,
@@ -122,8 +134,28 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
         .eq('id', widget.tutorId)
         .maybeSingle();
 
+    if (tutorData != null) {
+      _currentTutorName = tutorData['name'] ?? 'Tutor';
+      _hourlyRate = tutorData['hourly_rate'] ?? 0.0;
+    }
+
+
     if (tutorData == null) {
       throw Exception("Tutor Details Not Found For ID: ${widget.tutorId}");
+    }
+
+    _currentTutorName = tutorData['name']?.toString() ?? 'Unknown Tutor';
+
+    if (tutorData['skills'] != null) {
+      if (tutorData['skills'] is List) {
+        _tutorSkills = List<String>.from(tutorData['skills'].map((item) => item.toString()));
+      } else if (tutorData['skills'] is String) {
+        _tutorSkills = (tutorData['skills'] as String)
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
     }
 
     try {
@@ -157,6 +189,229 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     }
 
     return tutorData;
+  }
+
+
+  void _showInviteDialog(BuildContext context) {
+    for (var skill in _tutorSkills) {
+      selectedSkills.putIfAbsent(skill, () => false);
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            DateTime now = DateTime.now();
+            String formattedDate = DateFormat("EEE, MMM d, yyyy").format(now);
+            String formattedTime = DateFormat('hh:mm a').format(now);
+
+            int getMinutesFromDuration(String duration) {
+              switch (duration) {
+                case "1 Hour":
+                  return 60;
+                case "1.5 Hours":
+                  return 90;
+                case "2 Hours":
+                  return 120;
+                case "30 Minutes":
+                default:
+                  return 30;
+              }
+            }
+
+            int minutesToAdd = getMinutesFromDuration(selectedDuration);
+            DateTime endTime = now.add(Duration(minutes: minutesToAdd, seconds: 30));
+            String formattedEndTime = DateFormat('hh:mm a').format(endTime);
+
+            Widget buildSkillItem(String skillName) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Checkbox(
+                    activeColor: const Color(0xff0f766e),
+                    value: selectedSkills[skillName] ?? false,
+                    onChanged: (bool? value) {
+                      setDialogState(() {
+                        selectedSkills[skillName] = value ?? false;
+                      });
+                    },
+                  ),
+                  Flexible(child: TextWidget(text: skillName)),
+                ],
+              );
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 5,
+              backgroundColor: Colors.white,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(text: "Contract of $_currentTutorName", textSize: 20, textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          TextWidget(text: "Date: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                          SizedBox(width: 3,),
+                          TextWidget(text: formattedDate),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          TextWidget(text: "Time: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                          SizedBox(width: 3,),
+                          TextWidget(text: formattedTime),
+                          SizedBox(width: 5,),
+                          TextWidget(text: "To"),
+                          SizedBox(width: 5,),
+                          TextWidget(text: formattedEndTime)
+
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      TextWidget(text: "Duration Of Lesson", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                      const SizedBox(height: 15),
+                      DropdownWidget(
+                        hintText: "Select Duration",
+                        selectedValue: selectedDuration,
+                        items: const ["30 Minutes", "1 Hour", "1.5 Hours", "2 Hours"],
+                        onChanged: (newValue) {
+                          setDialogState(() {
+                            selectedDuration = newValue!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 15),
+
+                      if (_tutorSkills.isNotEmpty) ...[
+                        TextWidget(
+                          text: "What would you like to learn?",
+                          textWeight: FontWeight.bold,
+                          textColor: Color(0xff0f766e),
+                        ),
+                        const SizedBox(height: 5),
+
+                        for (int i = 0; i < _tutorSkills.length; i += 2) ...[
+                          Row(
+                            children: [
+                              Expanded(child: buildSkillItem(_tutorSkills[i])),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: (i + 1 < _tutorSkills.length)
+                                    ? buildSkillItem(_tutorSkills[i + 1])
+                                    : const SizedBox(),
+                              ),
+                            ],
+                          ),
+                        ],
+                        Row(
+                          children: [
+                            TextWidget(text: "Contract Rate: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                            SizedBox(width: 3,),
+                            TextWidget(text: "$_hourlyRate"),
+                            SizedBox(width: 3,),
+                            TextWidget(text: "/", textSize: 23, textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                            SizedBox(width: 3,),
+                            TextWidget(text: "hour",),
+                          ],
+                        )
+                      ],
+                      SizedBox(height: 20,),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButtonWidget(
+                              buttonText: "Cancel",
+                              buttonColor: Color(0xff0f766e),
+                              textColor: Colors.white,
+                              onTap: () {
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                          ),
+                          SizedBox(width: 10,),
+                          Expanded(
+                            child: ElevatedButtonWidget(
+                              buttonText: "Send Invite",
+                              buttonColor: Color(0xff0f766e),
+                              textColor: Colors.white,
+                              onTap: () => _sendInviteButton()
+                            ),
+                          )
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _sendInviteButton() async {
+    final currentStudentId = supabase.auth.currentUser?.id;
+    if (currentStudentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please login to send an invite")),
+      );
+      return;
+    }
+
+    // 2. Selected skills extract karein
+    List<String> chosenSkills = selectedSkills.entries
+        .where((entry) => entry.value == true)
+        .map((entry) => entry.key)
+        .toList();
+
+    if (chosenSkills.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select at least one skill")),
+      );
+      return;
+    }
+
+    try {
+      // 3. Supabase 'invites' table mein data store karein
+      await supabase.from('invites').insert({
+        'tutor_id': widget.tutorId,
+        'student_id': currentStudentId,
+        'duration': selectedDuration,
+        'selected_skills': chosenSkills,
+        'hourly_rate': _hourlyRate,
+        'status': 'pending',
+      });
+
+      if (context.mounted) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const StudentHomeScreen()));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Invitation sent successfully!"),
+            backgroundColor: Color(0xff0f766e),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error sending invite: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
   }
 
   @override
@@ -437,7 +692,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Employments Section (Updated with Details & Dates)
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -543,8 +797,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
-                      // Certifications / Ijazah Section (Updated with Details)
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -575,7 +827,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                                     child: Row(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Certificate Thumbnail
                                         (imageUrl != null)
                                             ? GestureDetector(
                                           onTap: () => _showCertificateImageDialog(imageUrl, title),
@@ -605,7 +856,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                                           child: const Icon(Icons.workspace_premium, color: Color(0xff0f766e)),
                                         ),
                                         const SizedBox(width: 12),
-                                        // Certification Info & Details
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -692,11 +942,14 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
         },
       ),
       bottomNavigationBar: SafeArea(
-        child: ElevatedButtonWidget(
-          buttonText: "Invite To Teach",
-          onTap: () {},
-          buttonColor: const Color(0xff0f766e),
-          textColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: ElevatedButtonWidget(
+            buttonText: "Invite To Teach",
+            onTap: () => _showInviteDialog(context),
+            buttonColor: const Color(0xff0f766e),
+            textColor: Colors.white,
+          ),
         ),
       ),
     );
