@@ -17,7 +17,6 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   late final String _currentUserId;
 
   String? _receiverProfileUrl;
-  bool _isLoadingProfile = true;
 
   final List<Map<String, dynamic>> _localMessages = [];
 
@@ -72,23 +71,11 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         if (mounted) {
           setState(() {
             _receiverProfileUrl = response!['profile_image'];
-            _isLoadingProfile = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _isLoadingProfile = false;
           });
         }
       }
     } catch (e) {
       debugPrint("Error fetching receiver profile image: $e");
-      if (mounted) {
-        setState(() {
-          _isLoadingProfile = false;
-        });
-      }
     }
   }
 
@@ -122,15 +109,18 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         'is_read': false,
       });
 
-      setState(() {
-        _localMessages.removeWhere((msg) => msg['id'] == tempId);
-      });
+      if (mounted) {
+        setState(() {
+          _localMessages.removeWhere((msg) => msg['id'] == tempId);
+        });
+      }
     } catch (e) {
-      setState(() {
-        _localMessages.removeWhere((msg) => msg['id'] == tempId);
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        setState(() {
+          _localMessages.removeWhere((msg) => msg['id'] == tempId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      }
     }
   }
 
@@ -143,57 +133,41 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         foregroundColor: Colors.white,
         title: Row(
           children: [
-            _receiverProfileUrl != null && _receiverProfileUrl!.isNotEmpty
-                ? CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.white,
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.white24,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.network(
+                borderRadius: BorderRadius.circular(18),
+                child: (_receiverProfileUrl != null && _receiverProfileUrl!.isNotEmpty)
+                    ? Image.network(
                   _receiverProfileUrl!,
-                  width: 40,
-                  height: 40,
+                  width: 36,
+                  height: 36,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stacktTrace) {
-                    return Center(
-                      child: Text(
-                        widget.receiverName.isNotEmpty ? widget.receiverName[0].toUpperCase() : '?',
-                        style: const TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                    );
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.person, color: Colors.white, size: 24);
                   },
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
-                    return const Center(
+                    return const SizedBox(
+                      width: 16,
+                      height: 16,
                       child: CircularProgressIndicator(
-                        color: Color(0xff0f766e),
+                        color: Colors.white,
                         strokeWidth: 2,
                       ),
                     );
                   },
-                ),
-              ),
-            )
-                :
-            CircleAvatar(
-              radius: 20,
-              foregroundColor: Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.all(1.0),
-                child: CircleAvatar(
-                  backgroundColor: Color(0xff0f766e),
-                  child: Text(
-                    widget.receiverName.isNotEmpty ? widget.receiverName[0].toUpperCase() : '?',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
+                )
+                    : const Icon(Icons.person, color: Colors.white, size: 24)
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 widget.receiverName,
                 overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -220,10 +194,20 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                     return (sId == current && rId == partner) || (sId == partner && rId == current);
                   }).toList();
 
-                  final combinedMessages = [..._localMessages, ...chatMessages];
+                  // Filter local messages that are already sent & present in Stream
+                  final filteredLocal = _localMessages.where((local) {
+                    return !chatMessages.any((db) => db['id'] == local['id']);
+                  }).toList();
+
+                  final combinedMessages = [...filteredLocal, ...chatMessages];
 
                   if (combinedMessages.isEmpty) {
-                    return const Center(child: Text("No conversation yet"));
+                    return const Center(
+                      child: Text(
+                        "No conversation yet",
+                        style: TextStyle(color: Colors.black54, fontSize: 14),
+                      ),
+                    );
                   }
 
                   return ListView.builder(
@@ -254,54 +238,52 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                               bottomRight: Radius.circular(isMe ? 0 : 12),
                             ),
                           ),
-                          child: IntrinsicWidth(
-                            child: Column(
-                              crossAxisAlignment: isMe ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  msg['message_text'] ?? '',
-                                  style: TextStyle(
-                                    color: isMe ? Colors.white : Colors.black87,
-                                    fontSize: 16,
-                                  ),
+                          child: Column(
+                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                msg['message_text'] ?? '',
+                                style: TextStyle(
+                                  color: isMe ? Colors.white : Colors.black87,
+                                  fontSize: 15,
                                 ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    if (isMe) ...[
-                                      Icon(
-                                        isSending ? Icons.access_time : Icons.done_all,
-                                        size: 14,
-                                        color: isSending
-                                            ? Colors.white54
-                                            : (isRead ? Colors.tealAccent : Colors.white70),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        isSending ? "Sending..." : (isRead ? "Seen" : "Sent"),
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.white70,
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                    ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  if (isMe) ...[
+                                    Icon(
+                                      isSending ? Icons.access_time : Icons.done_all,
+                                      size: 14,
+                                      color: isSending
+                                          ? Colors.white54
+                                          : (isRead ? Colors.tealAccent : Colors.white70),
+                                    ),
+                                    const SizedBox(width: 4),
                                     Text(
-                                      _formatMessageTime(msg['created_at']),
-                                      style: TextStyle(
+                                      isSending ? "Sending..." : (isRead ? "Seen" : "Sent"),
+                                      style: const TextStyle(
                                         fontSize: 10,
-                                        color: isMe ? Colors.white70 : Colors.black45,
+                                        color: Colors.white70,
                                         fontWeight: FontWeight.w400,
                                       ),
                                     ),
+                                    const SizedBox(width: 6),
                                   ],
-                                ),
-                              ],
-                            ),
+                                  Text(
+                                    _formatMessageTime(msg['created_at']),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isMe ? Colors.white70 : Colors.black45,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -325,15 +307,17 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                       },
                       decoration: InputDecoration(
                         hintText: "Type a message...",
+                        filled: true,
+                        fillColor: Colors.white,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
                         ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xff0f766e), width: 2),
-                          borderRadius: BorderRadius.all(Radius.circular(5)),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(color: Color(0xff0f766e), width: 1.5),
+                          borderRadius: BorderRadius.circular(24),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         suffixIcon: ValueListenableBuilder<TextEditingValue>(
                           valueListenable: _messageController,
                           builder: (context, value, child) {

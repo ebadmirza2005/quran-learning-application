@@ -132,10 +132,7 @@ class _StudentChatScreenState extends State<StudentChatScreen> {
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stacktTrace) {
                       return Center(
-                        child: Text(
-                          widget.receiverName.isNotEmpty ? widget.receiverName[0].toUpperCase() : '?',
-                          style: const TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                        child: Icon(Icons.person, color: Colors.white, size: 24)
                       );
                     },
                   loadingBuilder: (context, child, loadingProgress) {
@@ -158,10 +155,7 @@ class _StudentChatScreenState extends State<StudentChatScreen> {
                     padding: const EdgeInsets.all(1.0),
                     child: CircleAvatar(
                       backgroundColor: Color(0xff0f766e),
-                      child: Text(
-                        widget.receiverName.isNotEmpty ? widget.receiverName[0].toUpperCase() : '?',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
+                      child: const Icon(Icons.person, color: Colors.white, size: 24),
                     ),
                   ),
                 ),

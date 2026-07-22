@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
+import 'tutor_edit_info.dart';
 import 'tutor_test_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,26 +20,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _verificationStatus = 'unverified'; // Default status
   bool _isLoadingStatus = true;
 
+  // Profile Completion state variables
+  double _profileCompletionPercentage = 0.0;
+  List<String> _missingProfileFields = [];
+
   @override
   void initState() {
     super.initState();
     tabController = TabController(length: 2, vsync: this);
-    _fetchVerificationStatus();
+    _fetchTutorData();
   }
 
-  // Supabase se status fetch karne ka method
-  Future<void> _fetchVerificationStatus() async {
+  // Supabase se tutor status & profile data fetch aur calculate karne ka method
+  Future<void> _fetchTutorData() async {
     try {
       final user = supabase.auth.currentUser;
       if (user != null) {
         final data = await supabase
             .from('tutors')
-            .select('verification_status')
+            .select()
             .eq('id', user.id)
             .maybeSingle();
 
-        if (data != null && data['verification_status'] != null) {
-          String status = data['verification_status'].toString();
+        if (data != null) {
+          String status = (data['verification_status'] ?? 'unverified').toString();
+
+          // Profile completion calculation
+          _calculateProfileCompletion(data);
 
           setState(() {
             _verificationStatus = status;
@@ -67,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         }
       }
     } catch (e) {
-      debugPrint("Error fetching status: $e");
+      debugPrint("Error fetching tutor data: $e");
     } finally {
       if (mounted) {
         setState(() {
@@ -75,6 +83,52 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         });
       }
     }
+  }
+
+  // Calculation function
+  void _calculateProfileCompletion(Map<String, dynamic> data) {
+    int totalSteps = 4;
+    int completedSteps = 0;
+    List<String> missing = [];
+
+    // 1. Profile Picture Check
+    final profileImg = data['profile_image'] ?? data['profile_image_url'] ?? data['avatar_url'];
+    if (profileImg != null && profileImg.toString().trim().isNotEmpty) {
+      completedSteps++;
+    } else {
+      missing.add("Profile Picture");
+    }
+
+    // 2. Bio / About
+    final bioText = data['bio'] ?? data['about'];
+    if (bioText != null && bioText.toString().trim().isNotEmpty) {
+      completedSteps++;
+    } else {
+      missing.add("Bio/About");
+    }
+
+    // 3. Hourly Rate
+    final hourlyRate = data['hourly_rate'];
+    if (hourlyRate != null && (num.tryParse(hourlyRate.toString()) ?? 0) > 0) {
+      completedSteps++;
+    } else {
+      missing.add("Hourly Rate");
+    }
+
+    // 4. Audio/Video Sample
+    final audioUrl = data['recitation_audio_url'];
+    final videoUrl = data['recitation_video_url'];
+    if ((audioUrl != null && audioUrl.toString().trim().isNotEmpty) ||
+        (videoUrl != null && videoUrl.toString().trim().isNotEmpty)) {
+      completedSteps++;
+    } else {
+      missing.add("Audio/Video Sample");
+    }
+
+    setState(() {
+      _profileCompletionPercentage = completedSteps / totalSteps;
+      _missingProfileFields = missing;
+    });
   }
 
   void _showVerifiedDialog(BuildContext context) {
@@ -233,16 +287,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
       body: Column(
         children: [
-          if (!_isLoadingStatus && _verificationStatus != 'verified')
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Card(
-                color: Colors.white,
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                child: _buildVerificationCard(),
+          if (!_isLoadingStatus) ...[
+            if (_verificationStatus == 'verified' && _profileCompletionPercentage < 1.0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 4.0),
+                child: GestureDetector(
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TutorEditInfo()),
+                    );
+                    _fetchTutorData();
+                  },
+                  child: Card(
+                    color: Colors.white,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: _buildProfileCompletionCard(),
+                  ),
+                ),
               ),
-            ),
+
+            if (_verificationStatus != 'verified')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12.0, 4.0, 12.0, 12.0),
+                child: Card(
+                  color: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: _buildVerificationCard(),
+                ),
+              ),
+          ],
           Expanded(
             child: TabBarView(
               controller: tabController,
@@ -257,6 +333,40 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  Widget _buildProfileCompletionCard() {
+    int percentage = (_profileCompletionPercentage * 100).toInt();
+
+    return Padding(
+      padding: const EdgeInsets.all(14.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Profile Completion",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xff0f766e)),
+              ),
+              Text(
+                "$percentage%",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xff0f766e)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: _profileCompletionPercentage,
+            backgroundColor: Colors.grey.shade300,
+            color: const Color(0xff0f766e),
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildVerificationCard() {
     if (_verificationStatus == 'pending') {
       return Padding(
@@ -264,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: Column(
           children: [
             TextWidget(
-              text: "⏳ Your screening test has been submitted and is currently under review. Results will be updated within 12 hours.",
+              text: "⏳ Your screening test has been submitted and is currently under review. Results will be updated within 2 hours.",
             ),
             const SizedBox(height: 14),
             ElevatedButtonWidget(
@@ -290,7 +400,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             buttonColor: Colors.redAccent,
             textColor: Colors.white,
             onTap: () async {
-              // Retake karne par status reset hoga
               final user = supabase.auth.currentUser;
               if (user != null) {
                 final prefs = await SharedPreferences.getInstance();
@@ -300,7 +409,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 context,
                 MaterialPageRoute(builder: (_) => const TutorTestScreen()),
               );
-              _fetchVerificationStatus();
+              _fetchTutorData();
             },
           ),
           const SizedBox(height: 14),
@@ -324,7 +433,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 context,
                 MaterialPageRoute(builder: (_) => const TutorTestScreen()),
               );
-              _fetchVerificationStatus();
+              _fetchTutorData();
             },
           ),
           const SizedBox(height: 14),

@@ -183,22 +183,55 @@ class _MessageScreenState extends State<MessageScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      leading: CircleAvatar(
-                        radius: 24,
-                        backgroundColor: const Color(0xff0f766e),
-                        backgroundImage: partnerImage != null && partnerImage.toString().isNotEmpty
-                            ? NetworkImage(partnerImage.toString())
-                            : null,
-                        child: partnerImage == null || partnerImage.toString().isEmpty
-                            ? Text(
-                          partnerName.isNotEmpty ? partnerName[0].toUpperCase() : '?',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18
+                      leading: Positioned(
+                        top: -30,
+                        child: CircleAvatar(
+                          radius: 30,
+                          backgroundColor: const Color(0xff0f766e),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(30),
+                            child: partnerImage?.isNotEmpty == true
+                                ? Image.network(
+                              partnerImage!,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: Transform.translate(
+                                    offset: const Offset(0, 5),
+                                    child: const Icon(
+                                      Icons.person,
+                                      size: 65,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                );
+                              },
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                );
+                              },
+                            )
+                                : Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Transform.translate(
+                                offset: const Offset(0, 5),
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 65,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
                           ),
-                        )
-                            : null,
+                        ),
                       ),
                       title: Text(
                         partnerName,
@@ -220,7 +253,7 @@ class _MessageScreenState extends State<MessageScreen> {
                             textColor: Colors.black45,
                             textWeight: FontWeight.w500,
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 15),
                           const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
                         ],
                       ),

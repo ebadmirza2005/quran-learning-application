@@ -82,7 +82,7 @@ class _TutorTestScreenState extends State<TutorTestScreen> {
       if (mounted) {
         _showReviewPendingDialog(
           title: "Test Submitted Successfully! ⏳",
-          message: "Your test has been submitted. Your results are currently under review and will be updated within 12 hours.",
+          message: "Your test has been submitted. Your results are currently under review and will be updated within 2 hours.",
         );
 
       }

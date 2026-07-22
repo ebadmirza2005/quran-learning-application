@@ -46,6 +46,30 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     }
   }
 
+  // Helper method to construct image URL dynamically
+  String? _getValidImageUrl(Map<String, dynamic> item) {
+    dynamic rawUrl = item['image_url'] ??
+        item['certificate_image'] ??
+        item['certificate_url'] ??
+        item['image'] ??
+        item['document_url'] ??
+        item['url'];
+
+    if (rawUrl == null) return null;
+    String urlStr = rawUrl.toString().trim();
+    if (urlStr.isEmpty) return null;
+
+    if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+      return urlStr;
+    }
+
+    try {
+      return supabase.storage.from('certifications').getPublicUrl(urlStr);
+    } catch (_) {
+      return urlStr;
+    }
+  }
+
   // Dialog to view full certificate image
   void _showCertificateImageDialog(String imageUrl, String title) {
     showDialog(
@@ -92,7 +116,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
   }
 
   Future<Map<String, dynamic>?> _getTutorData() async {
-    // Fetch tutor basic information
     final tutorData = await supabase
         .from('tutors')
         .select()
@@ -103,7 +126,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
       throw Exception("Tutor Details Not Found For ID: ${widget.tutorId}");
     }
 
-    // Fetch tutor certifications relative to this tutor
     try {
       final certsResponse = await supabase
           .from('tutor_certifications')
@@ -119,7 +141,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
       }
     }
 
-    // Fetch tutor employments
     try {
       final empResponse = await supabase
           .from('tutor_employments')
@@ -416,7 +437,7 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Employments Section
+                      // Employments Section (Updated with Details & Dates)
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -429,42 +450,101 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                           title: const Text("Employments", style: TextStyle(fontWeight: FontWeight.w500)),
                           children: [
                             if (_employments.isNotEmpty)
-                              ListView.builder(
+                              ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: _employments.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
                                 itemBuilder: (context, index) {
                                   final item = _employments[index];
                                   final company = item['company'] ?? item['organization'] ?? 'Unknown Company';
-                                  final role = item['role'] ?? item['position'] ?? '';
-                                  final startDate = _formatDateString(item['start_date']?.toString());
-                                  final endDate = item['is_present'] == true
+                                  final role = item['role'] ?? item['position'] ?? item['designation'] ?? '';
+
+                                  final startDate = _formatDateString(item['start_date']?.toString() ?? item['from']?.toString());
+                                  final endDate = (item['is_present'] == true || item['is_current'] == true)
                                       ? 'Present'
-                                      : _formatDateString(item['end_date']?.toString());
+                                      : _formatDateString(item['end_date']?.toString() ?? item['to']?.toString());
+
                                   final duration = (startDate.isNotEmpty || endDate.isNotEmpty)
-                                      ? "$startDate - $endDate"
+                                      ? "$startDate - ${endDate.isNotEmpty ? endDate : 'Present'}"
                                       : '';
 
-                                  return ListTile(
-                                    title: Text(company, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    subtitle: Text(role.isNotEmpty ? "$role • $duration" : duration),
+                                  final description = item['description'] ?? item['details'] ?? item['summary'] ?? '';
+
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                company,
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                              ),
+                                            ),
+                                            if (duration.isNotEmpty)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xff0f766e).withOpacity(0.08),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  duration,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xff0f766e),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        if (role.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            role,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 14,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ],
+                                        if (description.toString().trim().isNotEmpty) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            description.toString().trim(),
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey.shade700,
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   );
                                 },
                               ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8.0),
-                              child: Center(
-                                child: _employments.isEmpty
-                                    ? const Text("No Employment Record Found!")
-                                    : null,
+                            if (_employments.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16.0),
+                                child: Center(
+                                  child: Text("No Employment Record Found!"),
+                                ),
                               ),
-                            ),
                             const SizedBox(height: 8),
                           ],
                         ),
                       ),
                       const SizedBox(height: 20),
 
+                      // Certifications / Ijazah Section (Updated with Details)
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -477,65 +557,103 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                           title: const Text("Certifications / Ijazah", style: TextStyle(fontWeight: FontWeight.w500)),
                           children: [
                             if (_certifications.isNotEmpty)
-                              ListView.builder(
+                              ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: _certifications.length,
+                                separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
                                 itemBuilder: (context, index) {
                                   final item = _certifications[index];
-                                  final title = item['title'] ?? item['degree'] ?? 'Certification';
-                                  final issuer = item['issuer'] ?? item['institute'] ?? 'Unknown Institute';
-                                  final year = _formatDateString(item['year']?.toString() ?? item['issue_date']?.toString());
-                                  final imageUrl = item['image_url'] ?? item['certificate_image'] ?? item['image'];
+                                  final title = item['title'] ?? item['degree'] ?? item['certificate_name'] ?? 'Certification';
+                                  final issuer = item['issuer'] ?? item['institute'] ?? item['organization'] ?? 'Unknown Institute';
+                                  final year = _formatDateString(item['year']?.toString() ?? item['issue_date']?.toString() ?? item['date']?.toString());
+                                  final details = item['description'] ?? item['details'] ?? item['subject'] ?? item['notes'] ?? '';
+                                  final imageUrl = _getValidImageUrl(item);
 
-                                  return ListTile(
-                                    leading: (imageUrl != null && imageUrl.toString().trim().isNotEmpty)
-                                        ? GestureDetector(
-                                      onTap: () => _showCertificateImageDialog(imageUrl.toString(), title),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Image.network(
-                                          imageUrl.toString(),
-                                          width: 48,
-                                          height: 48,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) => Container(
-                                            width: 48,
-                                            height: 48,
-                                            color: Colors.grey.shade200,
-                                            child: const Icon(Icons.workspace_premium, color: Color(0xff0f766e)),
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Certificate Thumbnail
+                                        (imageUrl != null)
+                                            ? GestureDetector(
+                                          onTap: () => _showCertificateImageDialog(imageUrl, title),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Image.network(
+                                              imageUrl,
+                                              width: 52,
+                                              height: 52,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) => Container(
+                                                width: 52,
+                                                height: 52,
+                                                color: Colors.grey.shade200,
+                                                child: const Icon(Icons.workspace_premium, color: Color(0xff0f766e)),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                            : Container(
+                                          width: 52,
+                                          height: 52,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xff0f766e).withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.workspace_premium, color: Color(0xff0f766e)),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Certification Info & Details
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                title,
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                year.isNotEmpty ? "By $issuer ($year)" : "By $issuer",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.grey.shade700,
+                                                ),
+                                              ),
+                                              if (details.toString().trim().isNotEmpty) ...[
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  details.toString().trim(),
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey.shade800,
+                                                    height: 1.3,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                         ),
-                                      ),
-                                    )
-                                        : Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xff0f766e).withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Icon(Icons.workspace_premium, color: Color(0xff0f766e)),
+                                        if (imageUrl != null)
+                                          IconButton(
+                                            icon: const Icon(Icons.visibility, color: Color(0xff0f766e)),
+                                            onPressed: () => _showCertificateImageDialog(imageUrl, title),
+                                          ),
+                                      ],
                                     ),
-                                    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    subtitle: Text(year.isNotEmpty ? "By $issuer ($year)" : "By $issuer"),
-                                    trailing: (imageUrl != null && imageUrl.toString().trim().isNotEmpty)
-                                        ? IconButton(
-                                      icon: const Icon(Icons.visibility, color: Color(0xff0f766e)),
-                                      onPressed: () => _showCertificateImageDialog(imageUrl.toString(), title),
-                                    )
-                                        : const Icon(Icons.verified, color: Color(0xff0f766e), size: 20),
                                   );
                                 },
                               ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8.0),
-                              child: Center(
-                                child: _certifications.isEmpty
-                                    ? const Text("No Certification Found!")
-                                    : null,
+                            if (_certifications.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16.0),
+                                child: Center(
+                                  child: Text("No Certification Found!"),
+                                ),
                               ),
-                            ),
                             const SizedBox(height: 8),
                           ],
                         ),
@@ -820,17 +938,10 @@ class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
 
       if (response.statusCode == 200) {
         final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/temp_audio.mp3');
+        await file.writeAsBytes(response.bodyBytes);
 
-        String extension = ".mp3";
-        if (lowerUrl.contains(".m4a")) extension = ".m4a";
-        if (lowerUrl.contains(".aac")) extension = ".aac";
-        if (lowerUrl.contains(".wav")) extension = ".wav";
-
-        final localFile = File('${tempDir.path}/temp_recitation_${rawUrl.hashCode}$extension');
-        await localFile.writeAsBytes(response.bodyBytes);
-
-        final duration = await _audioPlayer.setFilePath(localFile.path);
-
+        final duration = await _audioPlayer.setFilePath(file.path);
         if (mounted) {
           setState(() {
             if (duration != null) _duration = duration;
@@ -840,24 +951,17 @@ class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
         }
         await _audioPlayer.play();
       } else {
-        throw Exception("HTTP Download failed: ${response.statusCode}");
+        throw Exception("Failed to download audio file");
       }
     } catch (e) {
-      debugPrint("Audio Player Error: $e");
       if (mounted) {
         setState(() {
           _hasError = true;
           _isLoading = false;
-          _errorMessage = "Unable to play audio format on this device.";
+          _errorMessage = "Unable to play audio: ${e.toString()}";
         });
       }
     }
-  }
-
-  String _formatDuration(Duration duration) {
-    String minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    String seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return "$minutes:$seconds";
   }
 
   @override
@@ -883,20 +987,9 @@ class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
             Expanded(
               child: Text(
                 _errorMessage,
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(color: Colors.red, fontSize: 12),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.red),
-              onPressed: () {
-                setState(() {
-                  _hasError = false;
-                  _isSourceSet = false;
-                  _isLoading = false;
-                });
-                _toggleAudio();
-              },
-            )
           ],
         ),
       );
@@ -917,69 +1010,43 @@ class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
       ),
       child: Row(
         children: [
-          _isLoading
-              ? const SizedBox(
-            height: 40,
-            width: 40,
-            child: Padding(
-              padding: EdgeInsets.all(8.0),
+          IconButton(
+            icon: _isLoading
+                ? const SizedBox(
+              width: 24,
+              height: 24,
               child: CircularProgressIndicator(
-                color: Color(0xff0f766e),
                 strokeWidth: 2,
+                color: Color(0xff0f766e),
               ),
+            )
+                : Icon(
+              _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+              size: 36,
+              color: const Color(0xff0f766e),
             ),
-          )
-              : IconButton(
-            iconSize: 36,
-            color: const Color(0xff0f766e),
-            icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill),
             onPressed: _toggleAudio,
           ),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                  ),
-                  child: Slider(
-                    activeColor: const Color(0xff0f766e),
-                    inactiveColor: Colors.grey.shade300,
-                    min: 0.0,
-                    max: _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
-                    value: _position.inSeconds.toDouble().clamp(
-                      0.0,
-                      _duration.inSeconds.toDouble() > 0 ? _duration.inSeconds.toDouble() : 1.0,
-                    ),
-                    onChanged: (value) async {
-                      if (_isSourceSet) {
-                        final position = Duration(seconds: value.toInt());
-                        await _audioPlayer.seek(position);
-                      }
-                    },
-                  ),
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                trackHeight: 4,
+              ),
+              child: Slider(
+                activeColor: const Color(0xff0f766e),
+                inactiveColor: Colors.grey.shade300,
+                min: 0.0,
+                max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
+                value: _position.inMilliseconds.toDouble().clamp(
+                  0.0,
+                  _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _formatDuration(_position),
-                        style: const TextStyle(fontSize: 11, color: Colors.black54),
-                      ),
-                      Text(
-                        _formatDuration(_duration),
-                        style: const TextStyle(fontSize: 11, color: Colors.black54),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                onChanged: (value) {
+                  _audioPlayer.seek(Duration(milliseconds: value.toInt()));
+                },
+              ),
             ),
           ),
         ],

@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart'; // Gallery Picker
+import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:quran_learning_application/utils/text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,9 +22,11 @@ class TutorEditInfo extends StatefulWidget {
 class _TutorEditInfoState extends State<TutorEditInfo> {
   File? _selectedAudioFile;
   String? _audioFileName;
+  String? _existingAudioUrl;
 
   File? _selectedVideoFile;
   String? _videoFileName;
+  String? _existingVideoUrl;
 
   final TextEditingController _hourlyRateController = TextEditingController();
 
@@ -57,13 +59,15 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     try {
       final data = await _supabase
           .from('tutors')
-          .select('hourly_rate, employments, certifications')
+          .select('hourly_rate, employments, certifications, recitation_audio_url, video_url')
           .eq('id', user.id)
           .single();
 
       if (data != null) {
         setState(() {
           _hourlyRateController.text = (data['hourly_rate'] ?? 0.0).toString();
+          _existingAudioUrl = data['recitation_audio_url'];
+          _existingVideoUrl = data['video_url'];
 
           if (data['employments'] != null) {
             _employments = List<Map<String, dynamic>>.from(data['employments']);
@@ -200,6 +204,24 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     }
   }
 
+  void _removeAudio() {
+    setState(() {
+      _selectedAudioFile = null;
+      _audioFileName = null;
+      _existingAudioUrl = null;
+    });
+    _showSnackBar("Audio removed", Colors.orange);
+  }
+
+  void _removeVideo() {
+    setState(() {
+      _selectedVideoFile = null;
+      _videoFileName = null;
+      _existingVideoUrl = null;
+    });
+    _showSnackBar("Video removed", Colors.orange);
+  }
+
   void _showAddEmploymentDialog() {
     final companyController = TextEditingController();
 
@@ -306,7 +328,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                             ],
                           ),
                         ),
-
                         if (!isCurrentlyWorking) ...[
                           const SizedBox(width: 10),
                           Expanded(
@@ -351,9 +372,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                         ],
                       ],
                     ),
-
                     const SizedBox(height: 10),
-
                     Row(
                       children: [
                         Checkbox(
@@ -402,7 +421,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
                     ];
 
-                    // Day + Month Name + Year
                     String fromStr = "${startDate!.day} ${monthNames[startDate!.month - 1]} ${startDate!.year}";
                     String toStr = isCurrentlyWorking
                         ? "Present"
@@ -502,7 +520,6 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
                       ),
                     ),
                     const SizedBox(height: 15),
-
                     InkWell(
                       onTap: pickCertImage,
                       borderRadius: BorderRadius.circular(10),
@@ -610,8 +627,8 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
     });
 
     try {
-      String? audioUrl;
-      String? videoUrl;
+      String? audioUrl = _existingAudioUrl;
+      String? videoUrl = _existingVideoUrl;
 
       if (_selectedAudioFile != null && _audioFileName != null) {
         audioUrl = await _uploadFileToBucket(_selectedAudioFile!, _audioFileName!, 'audios');
@@ -644,33 +661,17 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         'hourly_rate': double.tryParse(_hourlyRateController.text) ?? 0.0,
         'employments': _employments,
         'certifications': processedCertifications,
+        'recitation_audio_url': audioUrl, // Saves null if removed
+        'video_url': videoUrl, // Saves null if removed
       };
 
-      if (audioUrl != null) {
-        updateData['recitation_audio_url'] = audioUrl;
-      }
-      if (videoUrl != null) {
-        updateData['recitation_video_url'] = videoUrl;
-      }
+      await _supabase.from('tutors').update(updateData).eq('id', user.id);
 
-      await _supabase
-          .from('tutors')
-          .update(updateData)
-          .eq('id', user.id);
-
-      _showSnackBar("Profile successfully updated! 🎉", Color(0xff0f766e));
-
-      setState(() {
-        _selectedAudioFile = null;
-        _audioFileName = null;
-        _selectedVideoFile = null;
-        _videoFileName = null;
-      });
+      _showSnackBar("Profile successfully updated! 🎉", const Color(0xff0f766e));
 
       if (mounted) {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
       }
-
     } catch (e) {
       debugPrint("Database Update Error: $e");
       _showSnackBar("Save failed: $e", Colors.redAccent);
@@ -691,7 +692,10 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = const Color(0xff0f766e);
+    const themeColor = Color(0xff0f766e);
+
+    final bool hasAudio = _selectedAudioFile != null || (_existingAudioUrl != null && _existingAudioUrl!.isNotEmpty);
+    final bool hasVideo = _selectedVideoFile != null || (_existingVideoUrl != null && _existingVideoUrl!.isNotEmpty);
 
     return Scaffold(
       backgroundColor: const Color(0xffd2dad2),
@@ -699,7 +703,7 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()));
+            Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const TutorHomeScreen()), (Route route) => false);
           },
         ),
         backgroundColor: themeColor,
@@ -711,8 +715,8 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
         centerTitle: true,
         elevation: 0,
       ),
-      body: _isLoading && _employments.isEmpty && _certifications.isEmpty
-          ? const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)))
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: themeColor))
           : SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -720,296 +724,276 @@ class _TutorEditInfoState extends State<TutorEditInfo> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Card(
-                elevation: 0,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey[200]!),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const TextWidget(text: "Hourly Fee (\$ )"),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: _hourlyRateController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(
-                          hintText: "1.0",
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      ),
-                    ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const TextWidget(
+                    text: "Hourly Rate (\$ ) *",
+                    textColor: themeColor,
+                    textWeight: FontWeight.bold,
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _hourlyRateController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      hintText: "1.0",
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
-              Padding(
-                padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
-                child: Text(
-                  "Recitation Audio",
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+              // Recitation Audio Field
+              const Padding(
+                padding: EdgeInsets.only(left: 4.0, bottom: 8.0),
+                child: TextWidget(
+                  text: "Audio Of Recitation",
+                  textColor: themeColor,
+                  textWeight: FontWeight.bold,
                 ),
               ),
-              InkWell(
-                onTap: _isLoading ? null : _pickAudio,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: _selectedAudioFile != null ? themeColor.withOpacity(0.05) : Colors.white,
+              Stack(
+                children: [
+                  InkWell(
+                    onTap: _isLoading ? null : _pickAudio,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _selectedAudioFile != null ? themeColor : Colors.grey[300]!,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: _selectedAudioFile != null ? themeColor : Colors.grey[100],
-                        child: Icon(
-                          Icons.audiotrack,
-                          size: 28,
-                          color: _selectedAudioFile != null ? Colors.white : Colors.grey[600],
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: hasAudio ? themeColor : Colors.black26,
+                          width: 2.0,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _audioFileName ?? "Tap To Choose Recitation Audio",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: _audioFileName != null ? FontWeight.w600 : FontWeight.w500,
-                          color: _audioFileName != null ? Colors.black87 : Colors.grey[500],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              Padding(
-                padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
-                child: Text(
-                  "Recitation Video",
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[700]),
-                ),
-              ),
-              InkWell(
-                onTap: _isLoading ? null : _pickVideo,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: _selectedVideoFile != null ? themeColor.withOpacity(0.05) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _selectedVideoFile != null ? themeColor : Colors.grey[300]!,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: _selectedVideoFile != null ? themeColor : Colors.grey[100],
-                        child: Icon(
-                          Icons.video_file,
-                          size: 28,
-                          color: _selectedVideoFile != null ? Colors.white : Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _videoFileName ?? "Tap To Choose Recitation Video",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: _videoFileName != null ? FontWeight.w600 : FontWeight.w500,
-                          color: _videoFileName != null ? Colors.black87 : Colors.grey[500],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: themeColor.withOpacity(0.5)),
-                ),
-                child: ExpansionTile(
-                  shape: const Border(),
-                  collapsedShape: const Border(),
-                  leading: Icon(Icons.business_center_outlined, color: themeColor),
-                  title: const Text("Employment History", style: TextStyle(fontWeight: FontWeight.w500)),
-                  children: [
-                    if (_employments.isNotEmpty)
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _employments.length,
-                        itemBuilder: (context, index) {
-                          final item = _employments[index];
-                          return ListTile(
-                            title: Text(item['company'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text(item['duration'] ?? ''),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              onPressed: () {
-                                setState(() {
-                                  _employments.removeAt(index);
-                                });
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Center(
-                        child: _employments.isEmpty ? const Text("No Employment History Found!") : null,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _showAddEmploymentDialog,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
                         children: [
-                          Icon(Icons.add, size: 18, color: themeColor),
-                          const SizedBox(width: 4),
-                          TextWidget(text: "Add Employment", textColor: themeColor),
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundColor: hasAudio ? themeColor : Colors.grey[100],
+                            child: Icon(
+                              Icons.audiotrack,
+                              size: 28,
+                              color: hasAudio ? Colors.white : Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _audioFileName ??
+                                (_existingAudioUrl != null
+                                    ? "Audio File Uploaded (Tap to change)"
+                                    : "Tap To Choose Recitation Audio"),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: hasAudio ? FontWeight.w600 : FontWeight.w500,
+                              color: hasAudio ? Colors.black87 : Colors.grey[600],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: themeColor.withOpacity(0.5)),
-                ),
-                child: ExpansionTile(
-                  shape: const Border(),
-                  collapsedShape: const Border(),
-                  leading: Icon(Icons.verified_outlined, color: themeColor),
-                  title: const Text("Certifications / Ijazah", style: TextStyle(fontWeight: FontWeight.w500)),
-                  children: [
-                    if (_certifications.isNotEmpty)
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _certifications.length,
-                        itemBuilder: (context, index) {
-                          final item = _certifications[index];
-                          final String? imgUrl = item['certificate_image'];
-                          final File? localFile = item['local_image'];
-
-                          return ListTile(
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: localFile != null
-                                  ? Image.file(localFile, width: 45, height: 45, fit: BoxFit.cover)
-                                  : (imgUrl != null && imgUrl.isNotEmpty)
-                                  ? GestureDetector(
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (_) => Dialog(
-                                      child: Image.network(imgUrl, fit: BoxFit.contain),
-                                    ),
-                                  );
-                                },
-                                child: Image.network(
-                                  imgUrl,
-                                  width: 45,
-                                  height: 45,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (c, e, s) => const Icon(Icons.card_membership, size: 35),
-                                ),
-                              )
-                                  : const Icon(Icons.card_membership, size: 35, color: Color(0xff0f766e)),
-                            ),
-                            title: Text(item['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text("By ${item['issuer']} (${item['year']})"),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              onPressed: () {
-                                setState(() {
-                                  _certifications.removeAt(index);
-                                });
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Center(
-                        child: _certifications.isEmpty ? const Text("No Certification Found!") : null,
+                  ),
+                  if (hasAudio)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.cancel, color: Colors.redAccent, size: 26),
+                        onPressed: _removeAudio,
+                        tooltip: "Remove Audio",
                       ),
                     ),
-                    TextButton(
-                      onPressed: _showAddCertificationDialog,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Tutor Video Field
+              const Padding(
+                padding: EdgeInsets.only(left: 4.0, bottom: 8.0),
+                child: TextWidget(
+                  text: "Video Of Tutor",
+                  textColor: themeColor,
+                  textWeight: FontWeight.bold,
+                ),
+              ),
+              Stack(
+                children: [
+                  InkWell(
+                    onTap: _isLoading ? null : _pickVideo,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: hasVideo ? themeColor : Colors.black26,
+                          width: 2.0,
+                        ),
+                      ),
+                      child: Column(
                         children: [
-                          Icon(Icons.add, size: 18, color: themeColor),
-                          const SizedBox(width: 4),
-                          TextWidget(text: "Add Certification", textColor: themeColor),
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundColor: hasVideo ? themeColor : Colors.grey[100],
+                            child: Icon(
+                              Icons.video_file,
+                              size: 28,
+                              color: hasVideo ? Colors.white : Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _videoFileName ??
+                                (_existingVideoUrl != null
+                                    ? "Video File Uploaded (Tap to change)"
+                                    : "Tap To Choose Recitation Video"),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: hasVideo ? FontWeight.w600 : FontWeight.w500,
+                              color: hasVideo ? Colors.black87 : Colors.grey[600],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
+                  ),
+                  if (hasVideo)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.cancel, color: Colors.redAccent, size: 26),
+                        onPressed: _removeVideo,
+                        tooltip: "Remove Video",
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
 
+              // Employment History Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const TextWidget(
+                    text: "Employment History",
+                    textColor: themeColor,
+                    textWeight: FontWeight.bold,
+                  ),
+                  IconButton(
+                    onPressed: _showAddEmploymentDialog,
+                    icon: const Icon(Icons.add_circle, color: themeColor, size: 28),
+                  ),
+                ],
+              ),
+              if (_employments.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text("No employments added yet.", style: TextStyle(color: Colors.black54)),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _employments.length,
+                  itemBuilder: (context, index) {
+                    final item = _employments[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        title: Text(item['company'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(item['duration'] ?? ''),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.redAccent),
+                          onPressed: () {
+                            setState(() {
+                              _employments.removeAt(index);
+                            });
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              const SizedBox(height: 24),
+
+              // Certifications Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const TextWidget(
+                    text: "Certifications / Ijazah",
+                    textColor: themeColor,
+                    textWeight: FontWeight.bold,
+                  ),
+                  IconButton(
+                    onPressed: _showAddCertificationDialog,
+                    icon: const Icon(Icons.add_circle, color: themeColor, size: 28),
+                  ),
+                ],
+              ),
+              if (_certifications.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text("No certifications added yet.", style: TextStyle(color: Colors.black54)),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _certifications.length,
+                  itemBuilder: (context, index) {
+                    final item = _certifications[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: item['local_image'] != null
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.file(item['local_image'], width: 40, height: 40, fit: BoxFit.cover),
+                        )
+                            : (item['certificate_image'] != null
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(item['certificate_image'], width: 40, height: 40, fit: BoxFit.cover),
+                        )
+                            : const Icon(Icons.workspace_premium, color: themeColor, size: 32)),
+                        title: Text(item['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text("${item['issuer'] ?? ''} ${item['year'] != null ? '(${item['year']})' : ''}"),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.redAccent),
+                          onPressed: () {
+                            setState(() {
+                              _certifications.removeAt(index);
+                            });
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              const SizedBox(height: 32),
+
+              // Save Button
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 50,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _saveChangesToSupabase,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xff0f766e),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey[300],
-                    disabledForegroundColor: Colors.grey[500],
+                    backgroundColor: themeColor,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                  )
-                      : const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle_outline, size: 20),
-                      SizedBox(width: 8),
-                      Text("Save Changes", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ],
+                  child: const Text(
+                    "Save Changes",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
               ),
