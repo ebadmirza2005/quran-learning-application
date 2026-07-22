@@ -6,6 +6,7 @@ class AuthField extends StatefulWidget {
   final Icon? authFieldIcon;
   final TextEditingController? controller;
   final bool isPassword;
+  final String message;
 
   const AuthField({
     super.key,
@@ -14,6 +15,7 @@ class AuthField extends StatefulWidget {
     this.authFieldIcon,
     this.controller,
     this.isPassword = false,
+    this.message = "",
   });
 
   @override
@@ -54,7 +56,7 @@ class _AuthFieldState extends State<AuthField> {
               : widget.authFieldIcon,
         ),
         validator: (v) {
-          if (v == null || v.isEmpty) return "${widget.authFieldText} is required";
+          if (v == null || v.isEmpty) return "${widget.message} is required";
           return null;
         },
       ),
