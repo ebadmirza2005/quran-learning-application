@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:quran_learning_application/screen/teacher_screen/tutor_call_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../utils/button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,17 +12,90 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  final supabase = Supabase.instance.client;
   late TabController tabController;
+  RealtimeChannel? _callChannel;
+
 
   @override
   void initState() {
     super.initState();
     tabController = TabController(length: 2, vsync: this);
+    _listenForIncomingCalls();
+  }
+
+  void _listenForIncomingCalls() {
+    final currentUserId = supabase.auth.currentUser?.id;
+
+    if (currentUserId == null) return;
+
+    _callChannel = supabase.channel('incoming_calls_$currentUserId')
+    .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'calls',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'receiver_id', value: currentUserId),
+        callback: (payload) {
+          final newCall = payload.newRecord;
+          if (newCall['status'] == 'calling' && mounted) {
+            _showIncomingCallDialog(newCall);
+          }
+
+    }).subscribe();
+  }
+
+  void _showIncomingCallDialog(Map<String, dynamic> callData) {
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            backgroundColor: Colors.grey.shade900,
+            title: Text("Incoming Video Call ", style: TextStyle(color: Colors.white),),
+            content: Text("${callData['caller_name']} is calling you...", style: TextStyle(color: Colors.white70),),
+            actions: [
+              TextButton(onPressed: () async {
+                Navigator.pop(context);
+
+                await supabase.from('calls').update({'status': 'rejected'}).eq('id', callData['id']);
+              }, child: Text("Decline", style: TextStyle(color: Colors.redAccent),)),
+              ElevatedButtonWidget(
+                buttonText: "Answer",
+                buttonColor: const Color(0xff0f766e),
+                textColor: Colors.white,
+                onTap: () async {
+                  Navigator.pop(context);
+
+                  // Status update in Supabase
+                  await supabase
+                      .from('calls')
+                      .update({'status': 'accepted'})
+                      .eq('id', callData['id']);
+
+                  if (mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TutorCallScreen(
+                          channelId: callData['channel_id'],
+                          receiverName: callData['caller_name'] ?? 'Student',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          );
+    });
   }
 
   @override
   void dispose() {
     tabController.dispose();
+    if(_callChannel != null) {
+      supabase.removeChannel(_callChannel!);
+    }
     super.dispose();
   }
 
@@ -48,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       body: TabBarView(
         controller: tabController,
         children: const [
-          MyTutorsTab(), // Accepted tutors yahan show hongay
+          MyTutorsTab(),
           StudentInvitesTab(),
         ],
       ),
@@ -250,7 +326,89 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                         onPressed: () {
                           // TODO: Direct Chat or Call screen navigation
                         },
-                      )
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.phone,
+                          color: Color(0xff0f766e),
+                        ),
+
+                        onPressed: () async {
+
+                          try {
+
+                            final studentUser =
+                                supabase.auth.currentUser;
+
+
+                            if(studentUser == null){
+                              return;
+                            }
+
+
+                            final tutorId =
+                            item['tutor_id'].toString();
+
+
+                            final tutorName =
+                            item['name'].toString();
+
+
+                            final channelId =
+                                "call_${item['invite_id']}_${DateTime.now().millisecondsSinceEpoch}";
+
+
+                            await supabase
+                                .from('calls')
+                                .insert({
+
+                              'caller_id': studentUser.id,
+
+                              'caller_name': "Student",
+
+                              'receiver_id': tutorId,
+
+                              'channel_id': channelId,
+
+                              'status': 'calling',
+
+                            });
+
+
+
+                            if(!mounted) return;
+
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => TutorCallScreen(
+                                  channelId: channelId,
+                                  receiverName: tutorName,
+                                ),
+                              ),
+                            );
+
+
+                          } catch(e){
+
+                            debugPrint(
+                                "Student Call Error: $e"
+                            );
+
+
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                              SnackBar(
+                                content:
+                                Text("Call Error: $e"),
+                              ),
+                            );
+
+                          }
+
+                        },
+                      ),
                     ],
                   ),
                 ),

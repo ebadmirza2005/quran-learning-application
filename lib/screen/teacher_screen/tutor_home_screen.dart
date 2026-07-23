@@ -18,6 +18,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late TabController tabController;
   final supabase = Supabase.instance.client;
+  RealtimeChannel? _callChannel;
+
 
   String _verificationStatus = 'unverified';
   bool _isLoadingStatus = true;
@@ -25,11 +27,49 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   double _profileCompletionPercentage = 0.0;
   List<String> _missingProfileFields = [];
 
+
   @override
   void initState() {
     super.initState();
     tabController = TabController(length: 2, vsync: this);
     _fetchTutorData();
+    _listenForIncomingCalls();
+  }
+
+  void _listenForIncomingCalls() {
+    final tutorUser = Supabase.instance.client.auth.currentUser;
+    if (tutorUser == null) return;
+
+    _callChannel = Supabase.instance.client
+        .channel('incoming_calls_${tutorUser.id}')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.insert, // Nayi call aane par
+      schema: 'public',
+      table: 'calls',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'receiver_id',
+        value: tutorUser.id,
+      ),
+      callback: (payload) {
+        final newRecord = payload.newRecord;
+
+        // Check karein ke status calling hai ya nahi
+        if (newRecord['status'] == 'calling' && mounted) {
+          final channelId = newRecord['channel_id']?.toString() ?? '';
+          final callerName = newRecord['caller_name']?.toString() ?? 'Student';
+          final callId = newRecord['id']?.toString() ?? '';
+
+          _showIncomingCallDialog(
+            context: context,
+            channelId: channelId,
+            callerName: callerName,
+            callId: callId,
+          );
+        }
+      },
+    )
+        .subscribe();
   }
 
   Future<void> _fetchTutorData() async {
@@ -94,6 +134,82 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         });
       }
     }
+  }
+
+  void _showIncomingCallDialog({
+    required BuildContext context,
+    required String channelId,
+    required String callerName,
+    required String callId,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) { // 👈 Renamed to dialogContext to avoid shadow conflict
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.call, color: Color(0xff0f766e)),
+              SizedBox(width: 8),
+              Text("Incoming Call"),
+            ],
+          ),
+          content: Text(
+            "$callerName is calling you...",
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            // ❌ DECLINE BUTTON
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(); // Dialog close
+                await Supabase.instance.client
+                    .from('calls')
+                    .update({'status': 'rejected'})
+                    .eq('id', callId);
+              },
+              child: const Text("Decline", style: TextStyle(color: Colors.red)),
+            ),
+
+            // 🟢 ACCEPT BUTTON
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff0f766e),
+              ),
+              onPressed: () async {
+                // 1. Dialog ko pehle close karein safely
+                Navigator.of(dialogContext).pop();
+
+                // 2. Database mein call status update karein
+                try {
+                  await Supabase.instance.client
+                      .from('calls')
+                      .update({'status': 'accepted'})
+                      .eq('id', callId);
+                } catch (e) {
+                  debugPrint("Error updating call status: $e");
+                }
+
+                // 3. Main context use karke Call Screen par Navigate karein
+                if (context.mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TutorCallScreen(
+                        channelId: channelId,
+                        receiverName: callerName,
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text("Accept", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _calculateProfileCompletion(Map<String, dynamic> data) {
@@ -269,6 +385,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    if (_callChannel != null) {
+      Supabase.instance.client.removeChannel(_callChannel!); // Clean up
+    }
     tabController.dispose();
     super.dispose();
   }
@@ -963,19 +1082,70 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                           );
                         },
                       ),
-                      IconButton(onPressed: () {
+                      IconButton(
+                        icon: const Icon(
+                          Icons.phone,
+                          color: Color(0xff0f766e),
+                        ),
+                        onPressed: () async {
+                          if (studentId.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Invalid Student ID")),
+                            );
+                            return;
+                          }
 
-                        if (studentId.isEmpty) return;
+                          try {
+                            final tutorUser = supabase.auth.currentUser;
 
-                        String channelId = "call_${invite['id']}";
+                            if (tutorUser == null) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Tutor not logged in")),
+                              );
+                              return;
+                            }
 
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TutorCallScreen(channelId: channelId, receiverName: studentName,)
-                          ),
-                        );
-                      }, icon: Icon(Icons.phone, color: Color(0xff0f766e),))
+                            // Safe fallback if invite['id'] is null
+                            final inviteId = invite['id']?.toString() ?? 'no_invite';
+                            final channelId = "call_${inviteId}_${DateTime.now().millisecondsSinceEpoch}";
+
+                            // Insert call into Supabase
+                            await supabase.from('calls').insert({
+                              'caller_id': tutorUser.id,
+                              'caller_name': "Tutor",
+                              'receiver_id': studentId,
+                              'channel_id': channelId,
+                              'status': 'calling',
+                            });
+
+                            // Check mounted before using context after async gap
+                            if (!context.mounted) return;
+
+                            // Navigate to Call Screen
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TutorCallScreen(
+                                  channelId: channelId,
+                                  receiverName: studentName,
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            debugPrint("CALL ERROR: $e");
+
+                            if (!context.mounted) return;
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Call Error: ${e.toString()}"),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        },
+                      ),
                     ],
                   ),
                 ),

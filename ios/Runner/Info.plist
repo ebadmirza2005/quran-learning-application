@@ -1,4 +1,3 @@
-
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -13,6 +12,14 @@
     <key>CFBundleAllowMixedLocalizations</key>
     <true/>
 
+    <!-- Microphone Permission (Required for Video/Audio Calling) -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app requires access to your microphone for audio and video calls.</string>
+
+    <!-- Camera Permission -->
+    <key>NSCameraUsageDescription</key>
+    <string>This app requires access to the camera for video calling and profile photos.</string>
+
     <key>NSAppleMusicUsageDescription</key>
     <string>This app requires access to your media library to select and upload your Quran recitation audio samples.</string>
     <key>UISupportsDocumentBrowser</key>
@@ -22,8 +29,6 @@
 
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app requires access to the photo library to upload your profile picture.</string>
-    <key>NSCameraUsageDescription</key>
-    <string>This app requires access to the camera to take photos for your profile picture.</string>
 
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
