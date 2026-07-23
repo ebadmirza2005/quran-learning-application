@@ -3,6 +3,7 @@ import 'package:quran_learning_application/screen/teacher_screen/tutor_call_scre
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../utils/button.dart';
+import 'student_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -366,8 +367,57 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.chat, color: Color(0xff0f766e)),
-                        onPressed: () {
-                          // TODO: Direct Chat or Call screen navigation
+                        onPressed: () async {
+                          try {
+                            final studentUser = supabase.auth.currentUser;
+
+                            if (studentUser == null) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Please login to start chat")),
+                              );
+                              return;
+                            }
+
+                            // 1. Tutor Details extract karein (item Map se)
+                            final tutorId = item['tutor_id']?.toString() ?? '';
+                            final tutorName = item['name']?.toString() ?? 'Tutor';
+                            final tutorImage = (item['profile_image'] ??
+                                item['avatar_url'] ??
+                                item['image'])?.toString();
+
+                            if (tutorId.isEmpty) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Invalid Tutor ID")),
+                              );
+                              return;
+                            }
+
+                            // Check context before navigation
+                            if (!context.mounted) return;
+
+                            // 2. Chat Screen par Navigate karein
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => StudentChatScreen( // 👈 Apni Chat Screen ka exact widget name yahan likhein
+                                  receiverId: tutorId,
+                                  receiverName: tutorName,
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            debugPrint("Chat Navigation Error: $e");
+
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Error opening chat: $e"),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
                         },
                       ),
                       IconButton(
@@ -375,52 +425,32 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                           Icons.phone,
                           color: Color(0xff0f766e),
                         ),
-
                         onPressed: () async {
-
                           try {
+                            final studentUser = supabase.auth.currentUser;
 
-                            final studentUser =
-                                supabase.auth.currentUser;
-
-
-                            if(studentUser == null){
+                            if (studentUser == null) {
                               return;
                             }
 
+                            final tutorId = item['tutor_id'].toString();
+                            final tutorName = item['name'].toString();
 
-                            final tutorId =
-                            item['tutor_id'].toString();
-
-
-                            final tutorName =
-                            item['name'].toString();
-
+                            // 👈 1. Supabase item map se image extract karein
+                            final tutorImage = item['profile_image'] ?? item['avatar_url'] ?? item['image'];
 
                             final channelId =
                                 "call_${item['invite_id']}_${DateTime.now().millisecondsSinceEpoch}";
 
-
-                            await supabase
-                                .from('calls')
-                                .insert({
-
+                            await supabase.from('calls').insert({
                               'caller_id': studentUser.id,
-
                               'caller_name': "Student",
-
                               'receiver_id': tutorId,
-
                               'channel_id': channelId,
-
                               'status': 'calling',
-
                             });
 
-
-
-                            if(!mounted) return;
-
+                            if (!mounted) return;
 
                             Navigator.push(
                               context,
@@ -428,28 +458,19 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                                 builder: (_) => TutorCallScreen(
                                   channelId: channelId,
                                   receiverName: tutorName,
+                                  receiverImage: tutorImage?.toString(), // 👈 2. Yahan String convert karke pass kar dein
                                 ),
                               ),
                             );
+                          } catch (e) {
+                            debugPrint("Student Call Error: $e");
 
-
-                          } catch(e){
-
-                            debugPrint(
-                                "Student Call Error: $e"
-                            );
-
-
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(
+                            ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content:
-                                Text("Call Error: $e"),
+                                content: Text("Call Error: $e"),
                               ),
                             );
-
                           }
-
                         },
                       ),
                     ],
