@@ -11,7 +11,6 @@ import '../../utils/drop_down_widget.dart';
 import '../../utils/text.dart';
 import 'package:intl/intl.dart';
 
-import '../student_home_screen.dart';
 import '../tutor_home_screen.dart';
 
 class TutorCompleteDetails extends StatefulWidget {
@@ -31,6 +30,10 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
   Map<String, bool> selectedSkills = {};
 
   String selectedDuration = "30 Minutes";
+  String inviteStatus = "none";
+  bool checkingInvite = true;
+
+  RealtimeChannel? _inviteChannel;
 
   String makeDataSafe(dynamic rawData) {
     if (rawData == null) return '-';
@@ -43,8 +46,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
 
   String _currentTutorName = '';
   double _hourlyRate = 0.00;
-
-
 
   String _formatDateString(String? rawDate) {
     if (rawDate == null || rawDate.trim().isEmpty) return '';
@@ -134,17 +135,17 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
         .eq('id', widget.tutorId)
         .maybeSingle();
 
-    if (tutorData != null) {
-      _currentTutorName = tutorData['name'] ?? 'Tutor';
-      _hourlyRate = tutorData['hourly_rate'] ?? 0.0;
-    }
-
-
     if (tutorData == null) {
       throw Exception("Tutor Details Not Found For ID: ${widget.tutorId}");
     }
 
-    _currentTutorName = tutorData['name']?.toString() ?? 'Unknown Tutor';
+    // FIX: safe numeric cast for hourly_rate (DB may return int, not double)
+    _hourlyRate = (tutorData['hourly_rate'] as num?)?.toDouble() ?? 0.0;
+
+    // FIX: removed duplicate assignment, kept a single safe fallback
+    _currentTutorName = tutorData['name']?.toString().trim().isNotEmpty == true
+        ? tutorData['name'].toString()
+        : 'Unknown Tutor';
 
     if (tutorData['skills'] != null) {
       if (tutorData['skills'] is List) {
@@ -191,6 +192,116 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     return tutorData;
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _checkInviteStatus();
+    _subscribeToInviteUpdates();
+  }
+
+  @override
+  void dispose() {
+    // NEW: stop listening when the screen is closed
+    if (_inviteChannel != null) {
+      supabase.removeChannel(_inviteChannel!);
+    }
+    super.dispose();
+  }
+
+  // NEW: listens live for any change to this tutor's invites so the button
+  // (Invite To Teach -> Hiring -> Hired) updates automatically, even if the
+  // tutor accepts/rejects while the student is still on this screen.
+  void _subscribeToInviteUpdates() {
+    final studentId = supabase.auth.currentUser?.id;
+    if (studentId == null) return;
+
+    _inviteChannel = supabase
+        .channel('invite_status_${widget.tutorId}_$studentId')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'invites',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'tutor_id',
+        value: widget.tutorId,
+      ),
+      callback: (payload) {
+        final newRecord = payload.newRecord;
+        final recordStudentId = newRecord['student_id']?.toString();
+
+        // sirf isi student ka invite update honay par react karein
+        if (recordStudentId == studentId) {
+          final updatedStatus = newRecord['status']?.toString() ?? 'none';
+          if (mounted) {
+            setState(() {
+              inviteStatus = updatedStatus;
+            });
+          }
+        }
+      },
+    )
+        .subscribe();
+  }
+
+  Future<void> _checkInviteStatus() async {
+    final studentId = supabase.auth.currentUser?.id;
+
+    if (studentId == null) {
+      if (mounted) {
+        setState(() {
+          checkingInvite = false;
+        });
+      }
+      return;
+    }
+
+    final response = await supabase
+        .from('invites')
+        .select('status')
+        .eq('student_id', studentId)
+        .eq('tutor_id', widget.tutorId)
+    // FIX: agar kabhi is student-tutor pair ki multiple invite rows ban jayen
+    // (jaise reject hone ke baad dobara invite bhejne se), to sirf sab se
+    // naya (latest) row uthayen taake .maybeSingle() crash na ho aur status
+    // hamesha sahi (persisted) reflect ho — app band/reopen hone ke baad bhi.
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    if (!mounted) return;
+
+    if (response != null) {
+      setState(() {
+        // FIX: safe string fallback instead of a direct dynamic assignment
+        inviteStatus = response['status']?.toString() ?? "none";
+      });
+    } else {
+      setState(() {
+        inviteStatus = "none";
+      });
+    }
+
+    setState(() {
+      checkingInvite = false;
+    });
+  }
+
+  String getInviteButtonText() {
+    if (inviteStatus == "pending") {
+      return "Hiring";
+    }
+
+    if (inviteStatus == "accepted") {
+      return "Hired";
+    }
+
+    if (inviteStatus == "rejected") {
+      return "Invite Again";
+    }
+
+    return "Invite To Teach";
+  }
 
   void _showInviteDialog(BuildContext context) {
     for (var skill in _tutorSkills) {
@@ -254,30 +365,34 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextWidget(text: "Contract of $_currentTutorName", textSize: 20, textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                      TextWidget(
+                        text: "Contract of $_currentTutorName",
+                        textSize: 20,
+                        textWeight: FontWeight.bold,
+                        textColor: const Color(0xff0f766e),
+                      ),
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          TextWidget(text: "Date: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
-                          SizedBox(width: 3,),
+                          TextWidget(text: "Date: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
+                          const SizedBox(width: 3),
                           TextWidget(text: formattedDate),
                         ],
                       ),
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          TextWidget(text: "Time: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
-                          SizedBox(width: 3,),
+                          TextWidget(text: "Time: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
+                          const SizedBox(width: 3),
                           TextWidget(text: formattedTime),
-                          SizedBox(width: 5,),
+                          const SizedBox(width: 5),
                           TextWidget(text: "To"),
-                          SizedBox(width: 5,),
-                          TextWidget(text: formattedEndTime)
-
+                          const SizedBox(width: 5),
+                          TextWidget(text: formattedEndTime),
                         ],
                       ),
                       const SizedBox(height: 15),
-                      TextWidget(text: "Duration Of Lesson", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                      TextWidget(text: "Duration Of Lesson", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
                       const SizedBox(height: 15),
                       DropdownWidget(
                         hintText: "Select Duration",
@@ -295,10 +410,9 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                         TextWidget(
                           text: "What would you like to learn?",
                           textWeight: FontWeight.bold,
-                          textColor: Color(0xff0f766e),
+                          textColor: const Color(0xff0f766e),
                         ),
                         const SizedBox(height: 5),
-
                         for (int i = 0; i < _tutorSkills.length; i += 2) ...[
                           Row(
                             children: [
@@ -314,36 +428,36 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                         ],
                         Row(
                           children: [
-                            TextWidget(text: "Contract Rate: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
-                            SizedBox(width: 3,),
-                            TextWidget(text: "$_hourlyRate"),
-                            SizedBox(width: 3,),
-                            TextWidget(text: "/", textSize: 23, textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
-                            SizedBox(width: 3,),
-                            TextWidget(text: "hour",),
+                            TextWidget(text: "Contract Rate: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
+                            const SizedBox(width: 3),
+                            TextWidget(text: _hourlyRate.toStringAsFixed(2)),
+                            const SizedBox(width: 3),
+                            TextWidget(text: "/", textSize: 23, textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
+                            const SizedBox(width: 3),
+                            TextWidget(text: "hour"),
                           ],
                         )
                       ],
-                      SizedBox(height: 20,),
+                      const SizedBox(height: 20),
                       Row(
                         children: [
                           Expanded(
                             child: ElevatedButtonWidget(
                               buttonText: "Cancel",
-                              buttonColor: Color(0xff0f766e),
+                              buttonColor: const Color(0xff0f766e),
                               textColor: Colors.white,
                               onTap: () {
                                 Navigator.of(context).pop();
                               },
                             ),
                           ),
-                          SizedBox(width: 10,),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: ElevatedButtonWidget(
                               buttonText: "Send Invite",
-                              buttonColor: Color(0xff0f766e),
+                              buttonColor: const Color(0xff0f766e),
                               textColor: Colors.white,
-                              onTap: () => _sendInviteButton()
+                              onTap: () => _sendInviteButton(),
                             ),
                           )
                         ],
@@ -368,7 +482,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
       return;
     }
 
-    // 2. Selected skills extract karein
     List<String> chosenSkills = selectedSkills.entries
         .where((entry) => entry.value == true)
         .map((entry) => entry.key)
@@ -382,25 +495,55 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     }
 
     try {
-      // 3. Supabase 'invites' table mein data store karein
-      await supabase.from('invites').insert({
-        'tutor_id': widget.tutorId,
-        'student_id': currentStudentId,
-        'duration': selectedDuration,
-        'selected_skills': chosenSkills,
-        'hourly_rate': _hourlyRate,
-        'status': 'pending',
+      // FIX: pehle check karein ke is student ka is tutor ke liye pehle se
+      // koi invite row maujood hai (e.g. reject hone ke baad dobara invite
+      // bhej rahe hain). Agar hai to usi row ko update karein — naya row
+      // insert na karein — taake har waqt sirf ek hi status persist ho aur
+      // app band/reopen hone par bhi sahi (Hiring/Hired) dikhe.
+      final existingInvite = await supabase
+          .from('invites')
+          .select('id')
+          .eq('student_id', currentStudentId)
+          .eq('tutor_id', widget.tutorId)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (existingInvite != null) {
+        await supabase.from('invites').update({
+          'duration': selectedDuration,
+          'selected_skills': chosenSkills,
+          'hourly_rate': _hourlyRate,
+          'status': 'pending',
+        }).eq('id', existingInvite['id']);
+      } else {
+        await supabase.from('invites').insert({
+          'tutor_id': widget.tutorId,
+          'student_id': currentStudentId,
+          'duration': selectedDuration,
+          'selected_skills': chosenSkills,
+          'hourly_rate': _hourlyRate,
+          'status': 'pending',
+        });
+      }
+
+      if (!mounted) return;
+
+      // FIX: turant button ko "Hiring" per le aayen (realtime update aane tak fallback)
+      setState(() {
+        inviteStatus = "pending";
       });
 
-      if (context.mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const StudentHomeScreen()));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Invitation sent successfully!"),
-            backgroundColor: Color(0xff0f766e),
-          ),
-        );
-      }
+      Navigator.of(context).pop(); // sirf invite dialog band karein
+
+      // FIX: ab StudentHomeScreen per navigate nahi karte — student isi profile
+      // screen par rukega taake button "Hiring" -> "Hired" transition dekh sake
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Invitation sent successfully!"),
+          backgroundColor: Color(0xff0f766e),
+        ),
+      );
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -411,7 +554,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
         );
       }
     }
-
   }
 
   @override
@@ -449,19 +591,23 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
             );
           }
 
+          if (!snapshot.hasData || snapshot.data == null) {
+            return const Center(child: Text("No tutor data available"));
+          }
+
           final tutorData = snapshot.data!;
-          final String? profileImage = tutorData['profile_image'];
-          final String tutorName = tutorData['name'] ?? 'Unknown Name';
-          final String tutorCity = tutorData['city'] ?? 'Unknown City';
-          final String tutorCountry = tutorData['country'] ?? 'Unknown Country';
+          final String? profileImage = tutorData['profile_image']?.toString();
+          final String tutorName = tutorData['name']?.toString() ?? 'Unknown Name';
+          final String tutorCity = tutorData['city']?.toString() ?? 'Unknown City';
+          final String tutorCountry = tutorData['country']?.toString() ?? 'Unknown Country';
           final String location = '$tutorCity, $tutorCountry';
           final double averageRating = (tutorData['rating'] as num? ?? 0.0).toDouble();
           final double hourlyRate = (tutorData['hourly_rate'] as num? ?? 0.0).toDouble();
           final String languages = makeDataSafe(tutorData['languages']);
-          final int tutorSessions = tutorData['sessions'] ?? 0;
-          final String? tutorVideo = tutorData['video_url'];
-          final String? tutorAudio = tutorData['recitation_audio_url'];
-          final String aboutTutor = tutorData['about'] ?? tutorData['bio'] ?? 'No bio provided.';
+          final int tutorSessions = (tutorData['sessions'] as num?)?.toInt() ?? 0;
+          final String? tutorVideo = tutorData['video_url']?.toString();
+          final String? tutorAudio = tutorData['recitation_audio_url']?.toString();
+          final String aboutTutor = (tutorData['about'] ?? tutorData['bio'])?.toString() ?? 'No bio provided.';
 
           return Column(
             children: [
@@ -663,6 +809,7 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                         borderRadius: BorderRadius.circular(12),
                         child: (tutorVideo != null && tutorVideo.trim().isNotEmpty)
                             ? TutorVideoPlayer(
+                          key: ValueKey(tutorVideo),
                           tutorVideo: tutorVideo,
                           height: 300,
                         )
@@ -711,8 +858,10 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                                 separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
                                 itemBuilder: (context, index) {
                                   final item = _employments[index];
-                                  final company = item['company'] ?? item['organization'] ?? 'Unknown Company';
-                                  final role = item['role'] ?? item['position'] ?? item['designation'] ?? '';
+                                  final String company =
+                                  (item['company'] ?? item['organization'] ?? 'Unknown Company').toString();
+                                  final String role =
+                                  (item['role'] ?? item['position'] ?? item['designation'] ?? '').toString();
 
                                   final startDate = _formatDateString(item['start_date']?.toString() ?? item['from']?.toString());
                                   final endDate = (item['is_present'] == true || item['is_current'] == true)
@@ -723,7 +872,8 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                                       ? "$startDate - ${endDate.isNotEmpty ? endDate : 'Present'}"
                                       : '';
 
-                                  final description = item['description'] ?? item['details'] ?? item['summary'] ?? '';
+                                  final String description =
+                                  (item['description'] ?? item['details'] ?? item['summary'] ?? '').toString();
 
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -769,10 +919,10 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                                             ),
                                           ),
                                         ],
-                                        if (description.toString().trim().isNotEmpty) ...[
+                                        if (description.trim().isNotEmpty) ...[
                                           const SizedBox(height: 6),
                                           Text(
-                                            description.toString().trim(),
+                                            description.trim(),
                                             style: TextStyle(
                                               fontSize: 13,
                                               color: Colors.grey.shade700,
@@ -816,10 +966,17 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                                 separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
                                 itemBuilder: (context, index) {
                                   final item = _certifications[index];
-                                  final title = item['title'] ?? item['degree'] ?? item['certificate_name'] ?? 'Certification';
-                                  final issuer = item['issuer'] ?? item['institute'] ?? item['organization'] ?? 'Unknown Institute';
-                                  final year = _formatDateString(item['year']?.toString() ?? item['issue_date']?.toString() ?? item['date']?.toString());
-                                  final details = item['description'] ?? item['details'] ?? item['subject'] ?? item['notes'] ?? '';
+                                  final String title =
+                                  (item['title'] ?? item['degree'] ?? item['certificate_name'] ?? 'Certification')
+                                      .toString();
+                                  final String issuer =
+                                  (item['issuer'] ?? item['institute'] ?? item['organization'] ?? 'Unknown Institute')
+                                      .toString();
+                                  final year = _formatDateString(
+                                      item['year']?.toString() ?? item['issue_date']?.toString() ?? item['date']?.toString());
+                                  final String details =
+                                  (item['description'] ?? item['details'] ?? item['subject'] ?? item['notes'] ?? '')
+                                      .toString();
                                   final imageUrl = _getValidImageUrl(item);
 
                                   return Padding(
@@ -873,10 +1030,10 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                                                   color: Colors.grey.shade700,
                                                 ),
                                               ),
-                                              if (details.toString().trim().isNotEmpty) ...[
+                                              if (details.trim().isNotEmpty) ...[
                                                 const SizedBox(height: 6),
                                                 Text(
-                                                  details.toString().trim(),
+                                                  details.trim(),
                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     color: Colors.grey.shade800,
@@ -945,9 +1102,25 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: ElevatedButtonWidget(
-            buttonText: "Invite To Teach",
-            onTap: () => _showInviteDialog(context),
-            buttonColor: const Color(0xff0f766e),
+            buttonText: getInviteButtonText(),
+            onTap: () {
+              if (inviteStatus == "pending") {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Invite is waiting for tutor approval")),
+                );
+                return;
+              }
+
+              if (inviteStatus == "accepted") {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("You already hired this tutor")),
+                );
+                return;
+              }
+
+              _showInviteDialog(context);
+            },
+            buttonColor:  inviteStatus == "pending" || inviteStatus == "accepted" ? Colors.grey : Color(0xff0f766e),
             textColor: Colors.white,
           ),
         ),
@@ -989,6 +1162,9 @@ class _TutorVideoPlayerState extends State<TutorVideoPlayer> {
 
       await _videoPlayerController.initialize();
 
+      // FIX: guard against calling setState after the widget is disposed
+      if (!mounted) return;
+
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController,
         aspectRatio: 16 / 9,
@@ -1005,9 +1181,8 @@ class _TutorVideoPlayerState extends State<TutorVideoPlayer> {
           );
         },
       );
-      if (mounted) {
-        setState(() {});
-      }
+
+      setState(() {});
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -1153,6 +1328,7 @@ class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
           lowerUrl.endsWith('.wav');
 
       if (!isValidFormat) {
+        if (!mounted) return;
         setState(() {
           _hasError = true;
           _isLoading = false;
@@ -1161,6 +1337,7 @@ class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
         return;
       }
 
+      if (!mounted) return;
       setState(() {
         _isLoading = true;
         _hasError = false;
@@ -1191,7 +1368,9 @@ class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
 
       if (response.statusCode == 200) {
         final tempDir = await getTemporaryDirectory();
-        final file = File('${tempDir.path}/temp_audio.mp3');
+        // FIX: use a unique filename per audio URL to avoid stale cached files
+        final fileName = 'temp_audio_${rawUrl.hashCode}.mp3';
+        final file = File('${tempDir.path}/$fileName');
         await file.writeAsBytes(response.bodyBytes);
 
         final duration = await _audioPlayer.setFilePath(file.path);

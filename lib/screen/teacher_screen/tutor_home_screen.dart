@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
+import 'tutor_call_screen.dart';
+import 'tutor_chat_screen.dart';
 import 'tutor_edit_info.dart';
 import 'tutor_test_screen.dart';
 
@@ -17,10 +19,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late TabController tabController;
   final supabase = Supabase.instance.client;
 
-  String _verificationStatus = 'unverified'; // Default status
+  String _verificationStatus = 'unverified';
   bool _isLoadingStatus = true;
 
-  // Profile Completion state variables
   double _profileCompletionPercentage = 0.0;
   List<String> _missingProfileFields = [];
 
@@ -31,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _fetchTutorData();
   }
 
-  // Supabase se tutor status & profile data fetch aur calculate karne ka method
   Future<void> _fetchTutorData() async {
     try {
       final user = supabase.auth.currentUser;
@@ -53,7 +53,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (data != null && mounted) {
         String status = (data['verification_status'] ?? 'unverified').toString();
 
-        // Profile completion calculation
         _calculateProfileCompletion(data);
 
         setState(() {
@@ -97,13 +96,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  // Calculation function
   void _calculateProfileCompletion(Map<String, dynamic> data) {
     int totalSteps = 4;
     int completedSteps = 0;
     List<String> missing = [];
 
-    // 1. Profile Picture Check
     final profileImg = data['profile_image'] ?? data['profile_image_url'] ?? data['avatar_url'];
     if (profileImg != null && profileImg.toString().trim().isNotEmpty) {
       completedSteps++;
@@ -111,7 +108,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       missing.add("Profile Picture");
     }
 
-    // 2. Bio / About
     final bioText = data['bio'] ?? data['about'];
     if (bioText != null && bioText.toString().trim().isNotEmpty) {
       completedSteps++;
@@ -119,7 +115,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       missing.add("Bio/About");
     }
 
-    // 3. Hourly Rate
     final hourlyRate = data['hourly_rate'];
     if (hourlyRate != null && (num.tryParse(hourlyRate.toString()) ?? 0) > 0) {
       completedSteps++;
@@ -127,7 +122,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       missing.add("Hourly Rate");
     }
 
-    // 4. Audio/Video Sample
     final audioUrl = data['recitation_audio_url'];
     final videoUrl = data['recitation_video_url'];
     if ((audioUrl != null && audioUrl.toString().trim().isNotEmpty) ||
@@ -337,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             child: TabBarView(
               controller: tabController,
               children: const [
-                Center(child: Text("No Students Found!")),
+                StudentsTabWidget(),
                 InvitesTabWidget(),
               ],
             ),
@@ -459,7 +453,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
-// Dynamic Invites Tab Widget using FutureBuilder
 class InvitesTabWidget extends StatefulWidget {
   const InvitesTabWidget({super.key});
 
@@ -468,21 +461,59 @@ class InvitesTabWidget extends StatefulWidget {
 }
 
 class _InvitesTabWidgetState extends State<InvitesTabWidget> {
+  final supabase = Supabase.instance.client;
   late Future<List<Map<String, dynamic>>> _invitesFuture;
+  RealtimeChannel? _inviteChannel;
 
   @override
   void initState() {
     super.initState();
     _loadInvites();
+    _subscribeToInviteChanges();
+  }
+
+  @override
+  void dispose() {
+    if (_inviteChannel != null) {
+      supabase.removeChannel(_inviteChannel!);
+    }
+    super.dispose();
+  }
+
+  void _subscribeToInviteChanges() {
+    final tutorId = supabase.auth.currentUser?.id;
+    if (tutorId == null) return;
+
+    _inviteChannel = supabase
+        .channel('invites_tab_$tutorId')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'invites',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'tutor_id',
+        value: tutorId,
+      ),
+      callback: (payload) {
+        if (mounted) {
+          setState(() {
+            _loadInvites();
+          });
+        }
+      },
+    )
+        .subscribe();
   }
 
   void _loadInvites() {
-    final tutorId = Supabase.instance.client.auth.currentUser?.id;
+    final tutorId = supabase.auth.currentUser?.id;
     if (tutorId != null) {
-      _invitesFuture = Supabase.instance.client
+      _invitesFuture = supabase
           .from('invites')
           .select()
           .eq('tutor_id', tutorId)
+          .neq('status', 'accepted')
           .order('created_at', ascending: false);
     } else {
       _invitesFuture = Future.value([]);
@@ -491,7 +522,7 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final tutorId = Supabase.instance.client.auth.currentUser?.id;
+    final tutorId = supabase.auth.currentUser?.id;
 
     if (tutorId == null) {
       return const Center(child: Text("User not logged in."));
@@ -541,8 +572,8 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
             itemBuilder: (context, index) {
               final invite = invites[index];
               final List<dynamic> skills = invite['selected_skills'] ?? [];
-              final String duration = invite['duration'] ?? 'N/A';
-              final String status = invite['status'] ?? 'pending';
+              final String duration = invite['duration']?.toString() ?? 'N/A';
+              final String status = invite['status']?.toString() ?? 'pending';
               final double rate = (invite['hourly_rate'] as num? ?? 0.0).toDouble();
 
               return Card(
@@ -571,8 +602,6 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                             decoration: BoxDecoration(
                               color: status == 'pending'
                                   ? Colors.orange.withOpacity(0.15)
-                                  : status == 'accepted'
-                                  ? Colors.green.withOpacity(0.15)
                                   : Colors.red.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -581,8 +610,6 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                               style: TextStyle(
                                 color: status == 'pending'
                                     ? Colors.orange.shade800
-                                    : status == 'accepted'
-                                    ? Colors.green.shade800
                                     : Colors.red.shade800,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
@@ -635,7 +662,7 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                               ),
                               onPressed: () async {
                                 try {
-                                  await Supabase.instance.client
+                                  await supabase
                                       .from('invites')
                                       .update({'status': 'rejected'})
                                       .eq('id', invite['id']);
@@ -660,7 +687,7 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                               ),
                               onPressed: () async {
                                 try {
-                                  await Supabase.instance.client
+                                  await supabase
                                       .from('invites')
                                       .update({'status': 'accepted'})
                                       .eq('id', invite['id']);
@@ -678,6 +705,277 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                           ],
                         ),
                       ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class StudentsTabWidget extends StatefulWidget {
+  const StudentsTabWidget({super.key});
+
+  @override
+  State<StudentsTabWidget> createState() => _StudentsTabWidgetState();
+}
+
+class _StudentsTabWidgetState extends State<StudentsTabWidget> {
+  final supabase = Supabase.instance.client;
+  late Future<List<Map<String, dynamic>>> _studentsFuture;
+  RealtimeChannel? _inviteChannel;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+    _subscribeToInviteChanges();
+  }
+
+  @override
+  void dispose() {
+    if (_inviteChannel != null) {
+      supabase.removeChannel(_inviteChannel!);
+    }
+    super.dispose();
+  }
+
+  void _subscribeToInviteChanges() {
+    final tutorId = supabase.auth.currentUser?.id;
+    if (tutorId == null) return;
+
+    _inviteChannel = supabase
+        .channel('my_students_tab_$tutorId')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'invites',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'tutor_id',
+        value: tutorId,
+      ),
+      callback: (payload) {
+        if (mounted) {
+          setState(() {
+            _loadStudents();
+          });
+        }
+      },
+    )
+        .subscribe();
+  }
+
+  void _loadStudents() {
+    _studentsFuture = _fetchAcceptedInvitesWithStudentInfo();
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchAcceptedInvitesWithStudentInfo() async {
+    final tutorId = supabase.auth.currentUser?.id;
+    if (tutorId == null) return [];
+
+    final acceptedInvitesRaw = await supabase
+        .from('invites')
+        .select()
+        .eq('tutor_id', tutorId)
+        .eq('status', 'accepted')
+        .order('created_at', ascending: false);
+
+    final List<Map<String, dynamic>> acceptedInvites =
+    List<Map<String, dynamic>>.from(acceptedInvitesRaw);
+
+    if (acceptedInvites.isEmpty) return acceptedInvites;
+
+    final studentIds = acceptedInvites
+        .map((invite) => invite['student_id']?.toString())
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    if (studentIds.isNotEmpty) {
+      try {
+        final studentsDataRaw = await supabase
+            .from('students')
+            .select()
+            .inFilter('id', studentIds);
+
+        final studentsData = List<Map<String, dynamic>>.from(studentsDataRaw);
+        final Map<String, Map<String, dynamic>> studentsById = {
+          for (final s in studentsData) s['id'].toString(): s,
+        };
+
+        for (final invite in acceptedInvites) {
+          final sid = invite['student_id']?.toString();
+          if (sid != null && studentsById.containsKey(sid)) {
+            invite['student_info'] = studentsById[sid];
+          }
+        }
+      } catch (e) {
+        debugPrint("Could not fetch student profiles: $e");
+      }
+    }
+
+    return acceptedInvites;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tutorId = supabase.auth.currentUser?.id;
+
+    if (tutorId == null) {
+      return const Center(child: Text("User not logged in."));
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _studentsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xff0f766e)),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              "Error loading students: ${snapshot.error}",
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final students = snapshot.data ?? [];
+
+        if (students.isEmpty) {
+          return const Center(
+            child: Text(
+              "No Students Found!",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            if (mounted) {
+              setState(() {
+                _loadStudents();
+              });
+            }
+          },
+          color: const Color(0xff0f766e),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: students.length,
+            itemBuilder: (context, index) {
+              final invite = students[index];
+              final studentInfo = invite['student_info'] as Map<String, dynamic>?;
+              final String studentId = invite['student_id']?.toString() ?? '';
+              final String studentName =
+              (studentInfo?['name'] ?? studentInfo?['full_name'] ?? 'Student').toString();
+              final String? studentImage =
+              (studentInfo?['profile_image'] ?? studentInfo?['avatar_url'])?.toString();
+              final List<dynamic> skills = invite['selected_skills'] ?? [];
+              final String duration = invite['duration']?.toString() ?? 'N/A';
+              final String rate = (invite['hourly_rate'] as num? ?? 0.0).toStringAsFixed(1);
+
+              return Card(
+                color: Colors.white,
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(14.0),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: const Color(0xff0f766e).withOpacity(0.1),
+                        backgroundImage: (studentImage != null && studentImage.isNotEmpty)
+                            ? NetworkImage(studentImage)
+                            : null,
+                        child: (studentImage == null || studentImage.isEmpty)
+                            ? const Icon(Icons.person, color: Color(0xff0f766e))
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              studentName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                TextWidget(text: "Learn"),
+                                TextWidget(text: " : "),
+                                TextWidget(text: skills.isNotEmpty ? skills.join(', ') : 'None'),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                TextWidget(text: "Duration"),
+                                TextWidget(text: " : "),
+                                TextWidget(text: duration),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                TextWidget(text: "Rate"),
+                                TextWidget(text: " : "),
+                                TextWidget(text: rate),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.message,
+                          color: Color(0xff0f766e),
+                        ),
+                        onPressed: () {
+                          if (studentId.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Student ID is missing!")),
+                            );
+                            return;
+                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TutorChatScreen(
+                                receiverId: studentId,
+                                receiverName: studentName,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      IconButton(onPressed: () {
+
+                        if (studentId.isEmpty) return;
+
+                        String channelId = "call_${invite['id']}";
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TutorCallScreen(channelId: channelId, receiverName: studentName,)
+                          ),
+                        );
+                      }, icon: Icon(Icons.phone, color: Color(0xff0f766e),))
                     ],
                   ),
                 ),
