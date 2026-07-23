@@ -24,70 +24,113 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _listenForIncomingCalls();
   }
 
+
   void _listenForIncomingCalls() {
     final currentUserId = supabase.auth.currentUser?.id;
 
     if (currentUserId == null) return;
 
-    _callChannel = supabase.channel('incoming_calls_$currentUserId')
-    .onPostgresChanges(
-        event: PostgresChangeEvent.insert,
-        schema: 'public',
-        table: 'calls',
-        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'receiver_id', value: currentUserId),
-        callback: (payload) {
-          final newCall = payload.newRecord;
-          if (newCall['status'] == 'calling' && mounted) {
-            _showIncomingCallDialog(newCall);
-          }
-
-    }).subscribe();
+    _callChannel = supabase
+        .channel('incoming_calls_$currentUserId')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'calls',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'receiver_id',
+        value: currentUserId,
+      ),
+      callback: (payload) {
+        final newCall = payload.newRecord;
+        if (newCall['status'] == 'calling' && mounted) {
+          // 💡 Required named parameters yahan map kiye gaye hain
+          _showIncomingCallDialog(
+            context: context,
+            channelId: newCall['channel_id'] ?? '',
+            callerName: newCall['caller_name'] ?? 'Tutor',
+            callId: newCall['id'] ?? '',
+          );
+        }
+      },
+    )
+        .subscribe();
   }
 
-  void _showIncomingCallDialog(Map<String, dynamic> callData) {
+  void _showIncomingCallDialog({
+    required BuildContext context,
+    required String channelId,
+    required String callerName,
+    required String callId,
+  }) {
     showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) {
-          return AlertDialog(
-            backgroundColor: Colors.grey.shade900,
-            title: Text("Incoming Video Call ", style: TextStyle(color: Colors.white),),
-            content: Text("${callData['caller_name']} is calling you...", style: TextStyle(color: Colors.white70),),
-            actions: [
-              TextButton(onPressed: () async {
-                Navigator.pop(context);
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.call, color: Color(0xff0f766e)),
+              SizedBox(width: 8),
+              Text("Incoming Call"),
+            ],
+          ),
+          content: Text(
+            "$callerName is calling you...",
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            // ❌ DECLINE BUTTON
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(); // Dialog close
+                await supabase
+                    .from('calls')
+                    .update({'status': 'rejected'})
+                    .eq('id', callId);
+              },
+              child: const Text("Decline", style: TextStyle(color: Colors.red)),
+            ),
 
-                await supabase.from('calls').update({'status': 'rejected'}).eq('id', callData['id']);
-              }, child: Text("Decline", style: TextStyle(color: Colors.redAccent),)),
-              ElevatedButtonWidget(
-                buttonText: "Answer",
-                buttonColor: const Color(0xff0f766e),
-                textColor: Colors.white,
-                onTap: () async {
-                  Navigator.pop(context);
+            // 🟢 ACCEPT BUTTON
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff0f766e),
+              ),
+              onPressed: () async {
+                // 1. Dialog ko close karein
+                Navigator.of(dialogContext).pop();
 
-                  // Status update in Supabase
+                // 2. Supabase mein call status update karein
+                try {
                   await supabase
                       .from('calls')
                       .update({'status': 'accepted'})
-                      .eq('id', callData['id']);
+                      .eq('id', callId);
+                } catch (e) {
+                  debugPrint("Error updating call status: $e");
+                }
 
-                  if (mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TutorCallScreen(
-                          channelId: callData['channel_id'],
-                          receiverName: callData['caller_name'] ?? 'Student',
-                        ),
+                // 3. Call Screen par Navigate karein
+                if (context.mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TutorCallScreen(
+                        channelId: channelId,
+                        receiverName: callerName,
                       ),
-                    );
-                  }
-                },
-              ),
-            ],
-          );
-    });
+                    ),
+                  );
+                }
+              },
+              child: const Text("Accept", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
