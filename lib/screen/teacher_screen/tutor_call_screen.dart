@@ -9,13 +9,13 @@ import '../../utils/text.dart';
 class TutorCallScreen extends StatefulWidget {
   final String channelId;
   final String receiverName;
-  final String? receiverImage; // 👈 1. Receiver Image URL Add Kiya
+  final String? receiverImage;
 
   const TutorCallScreen({
     super.key,
     required this.channelId,
     required this.receiverName,
-    this.receiverImage, // 👈 Nullable rakha hai taake crash na ho agar image na mile
+    this.receiverImage,
   });
 
   @override
@@ -43,7 +43,7 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
     _listenForCallEnd();
   }
 
-  // 1. Supabase Edge Function se Agora Token Fetch Karne Ka Function
+  // 1. Fetch Agora Token from Edge Function
   Future<String?> _fetchAgoraToken() async {
     try {
       debugPrint("🚀 Calling Edge Function for Channel: ${widget.channelId}");
@@ -56,16 +56,11 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
         },
       );
 
-      debugPrint("📩 Raw Response from Supabase: ${response.data}");
-
       if (response.data != null) {
         final token = response.data is Map ? response.data['token'] : response.data;
-        debugPrint("🔑 Final Token: $token");
         return token.toString();
-      } else {
-        debugPrint("❌ Response data is null");
-        return null;
       }
+      return null;
     } catch (e) {
       debugPrint("❌ Exception fetching token: $e");
       return null;
@@ -107,7 +102,6 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
 
       _engine!.registerEventHandler(RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-          debugPrint("✅ Local User Joined: ${connection.localUid}");
           if (mounted) {
             setState(() {
               _localUserJoined = true;
@@ -115,7 +109,6 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
           }
         },
         onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
-          debugPrint("🎉 Remote User Joined: $remoteUid");
           if (mounted) {
             setState(() {
               _remoteUid = remoteUid;
@@ -123,7 +116,6 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
           }
         },
         onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
-          debugPrint("❌ Remote User Left: $remoteUid");
           _leaveAndPop();
         },
         onError: (ErrorCodeType err, String msg) {
@@ -216,6 +208,8 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasValidImage = widget.receiverImage != null && widget.receiverImage!.trim().isNotEmpty;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -234,7 +228,7 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
               // Call Info Section
               Column(
                 children: [
-                  // 👈 2. Updated Profile Image Circle
+                  // Safe Profile Image Rendering
                   Container(
                     width: 120,
                     height: 120,
@@ -242,31 +236,45 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
                       shape: BoxShape.circle,
                       color: const Color(0xff0f766e),
                       border: Border.all(color: Colors.white24, width: 2),
-                      image: (widget.receiverImage != null && widget.receiverImage!.isNotEmpty)
-                          ? DecorationImage(
-                        image: NetworkImage(widget.receiverImage!),
-                        fit: BoxFit.cover,
-                      )
-                          : null,
                     ),
-                    child: (widget.receiverImage == null || widget.receiverImage!.isEmpty)
-                        ? Center(
-                      child: Text(
-                        widget.receiverName.isNotEmpty
-                            ? widget.receiverName[0].toUpperCase()
-                            : "U",
-                        style: const TextStyle(
-                          fontSize: 48,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                    child: ClipOval(
+                      child: hasValidImage
+                          ? Image.network(
+                        widget.receiverImage!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Fallback avatar text if image fails to load
+                          return Center(
+                            child: Text(
+                              widget.receiverName.isNotEmpty
+                                  ? widget.receiverName[0].toUpperCase()
+                                  : "U",
+                              style: const TextStyle(
+                                fontSize: 48,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                          : Center(
+                        child: Text(
+                          widget.receiverName.isNotEmpty
+                              ? widget.receiverName[0].toUpperCase()
+                              : "U",
+                          style: const TextStyle(
+                            fontSize: 48,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    )
-                        : null,
+                    ),
                   ),
                   const SizedBox(height: 20),
 
-                  // Receiver Name (Below Image)
+                  // Receiver Name
                   TextWidget(
                     text: widget.receiverName,
                     textSize: 22,
@@ -274,7 +282,7 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Call Status
+                  // Call Status Indicator
                   TextWidget(
                     text: _remoteUid != null
                         ? "Connected"
@@ -287,7 +295,7 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
                 ],
               ),
 
-              // Control Buttons (Mute, End Call, Speaker)
+              // Control Buttons
               Padding(
                 padding: const EdgeInsets.only(bottom: 50.0),
                 child: Row(

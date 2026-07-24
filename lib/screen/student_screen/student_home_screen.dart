@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:quran_learning_application/screen/teacher_screen/tutor_call_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../utils/button.dart';
+import '../../utils/text.dart';
 import 'student_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -252,21 +254,28 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
 
   Future<void> _endContract(dynamic inviteId) async {
     bool? confirm = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("End Contract"),
+        title: Center(child: const TextWidget(text: "End Contract", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),)),
         content: const Text(
-            "Are you sure you want to end this contract with the tutor?"),
+            "Terminating this contract will discontinue your scheduled sessions with this tutor. You will no longer be able to join their classroom. Do you wish to proceed?"),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("End Contract", style: TextStyle(color: Colors.white)),
-          ),
+          Row(
+            children: [
+              Expanded(child: ElevatedButtonWidget(buttonText: "No",
+                  textColor: Colors.white,
+                  buttonColor: Color(0xff0f766e),
+                  onTap: () => Navigator.of(context).pop(false))),
+              SizedBox(width: 10,),
+              Expanded(child: ElevatedButtonWidget(buttonText: "Yes",
+                buttonColor: Color(0xff0f766e),
+                textColor: Colors.white,
+                onTap: () {
+                  Navigator.of(context).pop(true);
+                },))
+            ],
+          )
         ],
       ),
     );
@@ -512,8 +521,8 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
               final item = tutors[index];
               final String name = item['name'];
               final String? profileImage = item['profile_image'];
-              final String location =
-              "${item['city']}, ${item['country']}".trim();
+              final String duration = item['duration'] ?? 'N/A';
+              final double rate = (item['hourly_rate'] as num?)?.toDouble() ?? 0.0;
               final List<dynamic> skills = item['selected_skills'] ?? [];
 
               return Card(
@@ -560,23 +569,25 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                                 color: Color(0xff0f766e),
                               ),
                             ),
-                            if (location.length > 2) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                location,
-                                style: const TextStyle(
-                                    color: Colors.black54, fontSize: 12),
-                              ),
-                            ],
                             const SizedBox(height: 6),
-                            Text(
-                              "Teach: ${skills.isNotEmpty ? skills.join(', ') : 'All'}",
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.black87,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            Row(
+                              children: [
+                                TextWidget(text: "Teach:  ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                                TextWidget(text: skills.isNotEmpty ? skills.join(', ') : 'All')
+                              ],
                             ),
+                            Row(
+                              children: [
+                                TextWidget(text: "Duration:  ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                                TextWidget(text: duration,)
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                TextWidget(text: "Rate:  ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                                TextWidget(text: '\$$rate / hour',)
+                              ],
+                            )
                           ],
                         ),
                       ),
@@ -647,15 +658,27 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
 
                             final tutorId = item['tutor_id'].toString();
                             final tutorName = item['name'].toString();
-
                             final tutorImage = item['profile_image'] ?? item['avatar_url'] ?? item['image'];
+
+                            // 🔴 1. Current Student ki Profile (Name & Image) 'students' table se fetch karein
+                            final studentProfile = await supabase
+                                .from('students') // Aapki students table
+                                .select('name, profile_image')
+                                .eq('id', studentUser.id)
+                                .maybeSingle();
+
+                            final String studentName = studentProfile?['name'] ??
+                                'Student';
+
+                            final String? studentImage = studentProfile?['profile_image'];
 
                             final channelId =
                                 "call_${item['invite_id']}_${DateTime.now().millisecondsSinceEpoch}";
 
+                            // 🔴 2. 'calls' table mein actual caller_name aur caller_image save karein
                             await supabase.from('calls').insert({
                               'caller_id': studentUser.id,
-                              'caller_name': "Student",
+                              'caller_name': studentName,        // 👈 Hardcoded 'Student' ki jagah actual name
                               'receiver_id': tutorId,
                               'channel_id': channelId,
                               'status': 'calling',
@@ -676,6 +699,7 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                           } catch (e) {
                             debugPrint("Student Call Error: $e");
 
+                            if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text("Call Error: $e"),
@@ -700,14 +724,11 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                         itemBuilder: (context) => [
                           const PopupMenuItem<String>(
                             value: 'end_contract',
-                            child: Text(
-                              "End Contract",
-                              style: TextStyle(color: Colors.red),
-                            ),
+                            child: TextWidget(text: "End Contract", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
                           ),
                           const PopupMenuItem<String>(
                             value: 'feedback',
-                            child: Text("Feedback"),
+                            child: TextWidget(text: "Feedback", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
                           ),
                         ],
                       )
@@ -866,94 +887,116 @@ class _StudentInvitesTabState extends State<StudentInvitesTab> {
               final List<dynamic> skills = invite['selected_skills'] ?? [];
               final inviteId = invite['id'];
 
-              return Card(
-                color: Colors.white,
-                elevation: 2,
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(14.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return Stack(
+                children: [
+                  Card(
+                    color: Colors.white,
+                    elevation: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14.0),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              "Tutor: $tutorName",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Color(0xff0f766e),
-                              ),
-                            ),
-                          ),
+                          SizedBox(height: 10,),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: status == 'pending'
-                                      ? Colors.orange.withOpacity(0.15)
-                                      : Colors.red.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  status.toUpperCase(),
-                                  style: TextStyle(
-                                    color: status == 'pending'
-                                        ? Colors.orange.shade800
-                                        : Colors.red.shade800,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
+                              Row(
+                                children: [
+                                  TextWidget(text: "Tutor: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e)),
+                                  TextWidget(text: tutorName, textWeight: FontWeight.w600),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                              InkWell(
-                                onTap: () => _deleteInvite(inviteId),
-                                borderRadius: BorderRadius.circular(20),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(2.0),
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 20,
-                                    color: Colors.grey,
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: status == 'pending'
+                                          ? Color(0xff0f766e).withOpacity(0.15)
+                                          : Color(0xffeb5757).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      status.toUpperCase(),
+                                      style: TextStyle(
+                                        color: status == 'pending'
+                                            ? Color(0xff0f766e).withOpacity(0.8)
+                                            : Color(0xffeb5757).withOpacity(0.8),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              TextWidget(text: "Duration: ",  textWeight: FontWeight.bold, textColor: Color(0xff0f766e)),
+                              TextWidget(text: duration, textWeight: FontWeight.w600),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                const TextSpan(text: "Skills: ", style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold)),
+                                TextSpan(text: skills.isNotEmpty ? skills.join(', ') : 'None', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                const TextSpan(text: "Rate: ", style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold)),
+                                TextSpan(text: "\$$rate / hour", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Duration: $duration",
-                        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 4),
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            const TextSpan(text: "Skills: ", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                            TextSpan(text: skills.isNotEmpty ? skills.join(', ') : 'None', style: const TextStyle(color: Colors.black87)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            const TextSpan(text: "Rate: ", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                            TextSpan(text: "\$$rate / hour", style: const TextStyle(color: Colors.black87)),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: GestureDetector(
+                      onTap: () {
+                        _deleteInvite(inviteId);
+                      },
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: Color(0xff0f766e),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade300, width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.12),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+
               );
             },
           ),

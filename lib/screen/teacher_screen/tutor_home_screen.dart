@@ -627,15 +627,53 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
   void _loadInvites() {
     final tutorId = supabase.auth.currentUser?.id;
     if (tutorId != null) {
-      _invitesFuture = supabase
-          .from('invites')
-          .select()
-          .eq('tutor_id', tutorId)
-          .neq('status', 'accepted')
-          .order('created_at', ascending: false);
+      _invitesFuture = _fetchInvitesWithStudentProfiles(tutorId);
     } else {
       _invitesFuture = Future.value([]);
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchInvitesWithStudentProfiles(String tutorId) async {
+    final List<dynamic> response = await supabase
+        .from('invites')
+        .select('*')
+        .eq('tutor_id', tutorId)
+        .neq('status', 'accepted')
+        .order('created_at', ascending: false);
+
+    List<Map<String, dynamic>> invites = List<Map<String, dynamic>>.from(response);
+
+    for (var invite in invites) {
+      debugPrint("INVITE RECORD: $invite");
+
+      final studentId = invite['student_id'] ??
+          invite['sender_id'] ??
+          invite['user_id'] ??
+          invite['studentId'];
+
+      if (studentId != null) {
+        try {
+          final studentData = await supabase
+              .from('students')
+              .select('*')
+              .eq('id', studentId)
+              .maybeSingle();
+
+          if (studentData != null) {
+            debugPrint("FETCHED STUDENT DATA: $studentData");
+            invite['student_profile'] = studentData;
+          } else {
+            debugPrint("No student found in 'students' table with ID: $studentId");
+          }
+        } catch (e) {
+          debugPrint("Error fetching student details: $e");
+        }
+      } else {
+        debugPrint("No student_id column found in invite record!");
+      }
+    }
+
+    return invites;
   }
 
   @override
@@ -689,6 +727,19 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
             itemCount: invites.length,
             itemBuilder: (context, index) {
               final invite = invites[index];
+
+              final studentProfile = invite['student_profile'] as Map<String, dynamic>?;
+
+              final String studentName =
+                  studentProfile?['name']?.toString() ??
+                      studentProfile?['full_name']?.toString() ??
+                      studentProfile?['student_name']?.toString() ??
+                      studentProfile?['username']?.toString() ??
+                      studentProfile?['email']?.toString() ??
+                      invite['student_name']?.toString() ??
+                      invite['name']?.toString() ??
+                      'Unknown Student';
+
               final List<dynamic> skills = invite['selected_skills'] ?? [];
               final String duration = invite['duration']?.toString() ?? 'N/A';
               final String status = invite['status']?.toString() ?? 'pending';
@@ -707,28 +758,34 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            "Duration: $duration",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Color(0xff0f766e),
-                            ),
+                          Row(
+                            children: [
+                              const TextWidget(
+                                text: "Student: ",
+                                textWeight: FontWeight.bold,
+                                textColor: Color(0xff0f766e),
+                              ),
+                              SizedBox(width: 8,),
+                              TextWidget(
+                                text: studentName,
+                                textWeight: FontWeight.w600,
+                              ),
+                            ],
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: status == 'pending'
-                                  ? Colors.orange.withOpacity(0.15)
-                                  : Colors.red.withOpacity(0.15),
+                                  ? Color(0xff0f766e).withOpacity(0.15)
+                                  : Color(0xffeb5757).withOpacity(0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               status.toUpperCase(),
                               style: TextStyle(
                                 color: status == 'pending'
-                                    ? Colors.orange.shade800
-                                    : Colors.red.shade800,
+                                    ? Color(0xff0f766e).withOpacity(0.8)
+                                    : Color(0xffeb5757).withOpacity(0.8),
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                               ),
@@ -736,29 +793,42 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
+
+                      Row(
+                        children: [
+                          TextWidget(text: "Duration: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                          SizedBox(width: 4,),
+                          TextWidget(text: duration, textWeight: FontWeight.w600),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
                       RichText(
                         text: TextSpan(
                           children: [
                             const TextSpan(
                               text: "Skills: ",
-                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold),
                             ),
+                            WidgetSpan(child: SizedBox(width: 6,)),
                             TextSpan(
                               text: skills.isNotEmpty ? skills.join(', ') : 'None',
-                              style: const TextStyle(color: Colors.black87),
+                              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 10),
+
+                      // Rate Section
                       RichText(
                         text: TextSpan(
                           children: [
                             const TextSpan(
                               text: "Rate: ",
-                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.w600),
                             ),
+                            WidgetSpan(child: SizedBox(width: 6,)),
                             TextSpan(
                               text: "\$$rate / hour",
                               style: const TextStyle(color: Colors.black87),
@@ -766,6 +836,8 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                           ],
                         ),
                       ),
+
+                      // Accept / Reject Buttons
                       if (status == 'pending') ...[
                         const SizedBox(height: 12),
                         Row(
@@ -1001,151 +1073,316 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
               final String duration = invite['duration']?.toString() ?? 'N/A';
               final String rate = (invite['hourly_rate'] as num? ?? 0.0).toStringAsFixed(1);
 
-              return Card(
-                color: Colors.white,
-                elevation: 2,
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(14.0),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: const Color(0xff0f766e).withOpacity(0.1),
-                        backgroundImage: (studentImage != null && studentImage.isNotEmpty)
-                            ? NetworkImage(studentImage)
-                            : null,
-                        child: (studentImage == null || studentImage.isEmpty)
-                            ? const Icon(Icons.person, color: Color(0xff0f766e))
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              studentName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Color(0xff0f766e),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Skills: ${skills.isNotEmpty ? skills.join(', ') : 'None'}",
-                              style: const TextStyle(color: Colors.black87),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              "Duration: $duration",
-                              style: const TextStyle(color: Colors.black54, fontSize: 12),
-                            ),
-                            Row(
+              return Stack(
+                clipBehavior: Clip.none, // Cross button ko border clip hone se bachane ke liye
+                children: [
+                  // Main Card Component
+                  Card(
+                    color: Colors.white,
+                    elevation: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14.0),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: const Color(0xff0f766e).withOpacity(0.1),
+                            backgroundImage: (studentImage != null && studentImage.isNotEmpty)
+                                ? NetworkImage(studentImage)
+                                : null,
+                            child: (studentImage == null || studentImage.isEmpty)
+                                ? const Icon(Icons.person, color: Color(0xff0f766e))
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                TextWidget(text: "Rate "),
-                                TextWidget(text: " \$$rate/hr"),
+                                Text(
+                                  studentName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Color(0xff0f766e),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    TextWidget(
+                                      text: "Learn:  ",
+                                      textWeight: FontWeight.bold,
+                                      textColor: const Color(0xff0f766e),
+                                    ),
+                                    Expanded(
+                                      child: TextWidget(
+                                        text: skills.isNotEmpty ? skills.join(', ') : 'None',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    TextWidget(
+                                      text: "Duration:  ",
+                                      textWeight: FontWeight.bold,
+                                      textColor: const Color(0xff0f766e),
+                                    ),
+                                    TextWidget(text: duration),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    TextWidget(
+                                      text: "Rate:  ",
+                                      textWeight: FontWeight.bold,
+                                      textColor: const Color(0xff0f766e),
+                                    ),
+                                    TextWidget(text: "\$$rate/hr"),
+                                  ],
+                                ),
                               ],
-                            )
-                          ],
-                        ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.message,
+                              color: Color(0xff0f766e),
+                            ),
+                            onPressed: () {
+                              if (studentId.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Student ID is missing!")),
+                                );
+                                return;
+                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TutorChatScreen(
+                                    receiverId: studentId,
+                                    receiverName: studentName,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.phone,
+                              color: Color(0xff0f766e),
+                            ),
+                            onPressed: () async {
+                              if (studentId.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Invalid Student ID")),
+                                );
+                                return;
+                              }
+
+                              try {
+                                final tutorUser = supabase.auth.currentUser;
+
+                                if (tutorUser == null) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text("Tutor not logged in")),
+                                  );
+                                  return;
+                                }
+
+                                // 🔴 1. Student Image Fallback Check
+                                final studentImageUrl = studentImage ??
+                                    invite['student_image'] ??
+                                    invite['avatar_url'] ??
+                                    invite['profile_image'] ??
+                                    invite['image'];
+
+                                final inviteId = invite['id']?.toString() ?? 'no_invite';
+                                final channelId = "call_${inviteId}_${DateTime.now().millisecondsSinceEpoch}";
+
+                                // 🔴 2. Tutor Profile Data Fetching with Column Fallbacks
+                                final tutorProfile = await supabase
+                                    .from('tutors')
+                                    .select('*')
+                                    .eq('id', tutorUser.id)
+                                    .maybeSingle();
+
+                                final String tutorName = tutorProfile?['name'] ??
+                                    tutorProfile?['full_name'] ??
+                                    "Tutor";
+
+                                // Multiple fallback checks for Tutor Image column names
+                                final String? tutorImage = tutorProfile?['caller_image'] ??
+                                    tutorProfile?['profile_image'] ??
+                                    tutorProfile?['image'] ??
+                                    tutorProfile?['photo'];
+
+                                // 🔴 3. Insert into Supabase Calls table
+                                await supabase.from('calls').insert({
+                                  'caller_id': tutorUser.id,
+                                  'caller_name': tutorName,
+                                  'caller_image': tutorImage, // 👈 Ensures image URL is passed correctly
+                                  'receiver_id': studentId,
+                                  'channel_id': channelId,
+                                  'status': 'calling',
+                                });
+
+                                if (!context.mounted) return;
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TutorCallScreen(
+                                      channelId: channelId,
+                                      receiverName: studentName,
+                                      receiverImage: studentImageUrl?.toString(),
+                                    ),
+                                  ),
+                                );
+                              } catch (e) {
+                                debugPrint("CALL ERROR: $e");
+
+                                if (!context.mounted) return;
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text("Call Error: ${e.toString()}"),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.message,
-                          color: Color(0xff0f766e),
-                        ),
-                        onPressed: () {
-                          if (studentId.isEmpty) {
+                    ),
+                  ),
+
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: GestureDetector(
+                      onTap: () async {
+                        final bool? shouldEnd = await showDialog<bool>(
+                          barrierDismissible: false,
+                          context: context,
+                          builder: (BuildContext dialogContext) {
+                            return AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              title: Center(child: const TextWidget(text: "End Contract", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),)),
+                              content: Text(
+                                "Ending this contract will terminate your teaching sessions with $studentName and remove your classroom access for this student. Do you wish to proceed?",
+                              ),
+                              actions: [
+                                Row(
+                                  children: [
+                                    Expanded(child: ElevatedButtonWidget(buttonText: "No",
+                                        textColor: Colors.white,
+                                        buttonColor: Color(0xff0f766e),
+                                        onTap: () => Navigator.of(dialogContext).pop(false))),
+                                    SizedBox(width: 10,),
+                                    Expanded(child: ElevatedButtonWidget(buttonText: "Yes",
+                                        buttonColor: Color(0xff0f766e),
+                                        textColor: Colors.white,
+                                        onTap: () {
+                                          Navigator.of(dialogContext).pop(true);
+                                    },))
+                                  ],
+                                )
+                              ],
+                            );
+                          },
+                        );
+
+                        if (shouldEnd != true) return;
+
+                        // 2. Supabase DB update / end contract logic execute karein
+                        try {
+                          final inviteId = invite['id'];
+
+                          if (inviteId == null) {
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Student ID is missing!")),
+                              const SnackBar(content: Text("Invite ID is missing!")),
                             );
                             return;
                           }
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => TutorChatScreen(
-                                receiverId: studentId,
-                                receiverName: studentName,
+
+                          // Show loading dialog
+                          if (context.mounted) {
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => const Center(
+                                child: CircularProgressIndicator(color: Color(0xff0f766e)),
                               ),
+                            );
+                          }
+
+                          // Option A: Status update karna (Recommended practice)
+                          await supabase
+                              .from('invites') // Aapki contract/invites table ka naam
+                              .update({'status': 'ended'})
+                              .eq('id', inviteId);
+
+
+                          if (!context.mounted) return;
+                          Navigator.pop(context); // Close loading indicator
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Contract ended successfully"),
+                              backgroundColor: Color(0xff0f766e),
                             ),
                           );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.phone,
+                          // onRefresh();
+
+                        } catch (e) {
+                          debugPrint("END CONTRACT ERROR: $e");
+
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Error ending contract: ${e.toString()}"),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
                           color: Color(0xff0f766e),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade300, width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.12),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        onPressed: () async {
-                          if (studentId.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Invalid Student ID")),
-                            );
-                            return;
-                          }
-
-                          try {
-                            final tutorUser = supabase.auth.currentUser;
-
-                            if (tutorUser == null) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Tutor not logged in")),
-                              );
-                              return;
-                            }
-
-                            // 👈 1. Student image fetch karein (variable se ya invite Map se)
-                            final studentImageUrl = studentImage ?? invite['student_image'] ?? invite['avatar_url'] ?? invite['profile_image'];
-
-                            // Safe fallback if invite['id'] is null
-                            final inviteId = invite['id']?.toString() ?? 'no_invite';
-                            final channelId = "call_${inviteId}_${DateTime.now().millisecondsSinceEpoch}";
-
-                            // Insert call into Supabase
-                            await supabase.from('calls').insert({
-                              'caller_id': tutorUser.id,
-                              'caller_name': "Tutor",
-                              'receiver_id': studentId,
-                              'channel_id': channelId,
-                              'status': 'calling',
-                            });
-
-                            // Check mounted before using context after async gap
-                            if (!context.mounted) return;
-
-                            // Navigate to Call Screen
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TutorCallScreen(
-                                  channelId: channelId,
-                                  receiverName: studentName,
-                                  receiverImage: studentImageUrl?.toString(), // 👈 2. Yahan receiverImage pass kar diya
-                                ),
-                              ),
-                            );
-                          } catch (e) {
-                            debugPrint("CALL ERROR: $e");
-
-                            if (!context.mounted) return;
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("Call Error: ${e.toString()}"),
-                                backgroundColor: Colors.redAccent,
-                              ),
-                            );
-                          }
-                        },
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               );
             },
           ),
