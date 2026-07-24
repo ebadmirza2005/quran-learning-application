@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:quran_learning_application/screen/teacher_screen/tutor_call_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../utils/text.dart';
 import 'student_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -192,7 +190,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
     final currentStudentId = supabase.auth.currentUser?.id;
     if (currentStudentId == null) return [];
 
-    // 1. Fetch accepted invites
     final List<dynamic> invitesResponse = await supabase
         .from('invites')
         .select()
@@ -213,7 +210,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
 
     if (tutorIds.isEmpty) return [];
 
-    // 2. Fetch tutor details including their current rating column
     final List<dynamic> tutorsResponse = await supabase
         .from('tutors')
         .select()
@@ -254,7 +250,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
     });
   }
 
-  // --- 1. END CONTRACT LOGIC ---
   Future<void> _endContract(dynamic inviteId) async {
     bool? confirm = await showDialog<bool>(
       context: context,
@@ -299,7 +294,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
     }
   }
 
-  // --- 2. FEEDBACK & RATING DIALOG ---
 
   void _showFeedbackDialog(String tutorId, String tutorName) {
     double selectedRating = 5.0;
@@ -389,11 +383,9 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // 1. Storage key mein studentId shamil kiya hai taaki har student ka alag record rahe
       String storageKey = 'user_rating_${tutorId}_$studentId';
       double? previousUserRating = prefs.getDouble(storageKey);
 
-      // 2. Database se current rating aur count fetch karein
       final response = await supabase
           .from('tutors')
           .select('rating, rating_count')
@@ -412,7 +404,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
         return;
       }
 
-      // Null safety ke saath fetch
       double currentRating = (response['rating'] as num?)?.toDouble() ?? 0.0;
       int currentCount = (response['rating_count'] as num?)?.toInt() ?? 0;
 
@@ -420,20 +411,14 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
       double updatedRating;
 
       if (previousUserRating != null) {
-        // -------------------------------------------------------------
-        // CASE 1: ISHI STUDENT NE PEHLE SE RATING DI HUI HAI (Overwrite)
-        // -------------------------------------------------------------
+
         updatedCount = currentCount == 0 ? 1 : currentCount; // Count same rahega
 
         double currentTotalSum = currentRating * updatedCount;
-        // Issi student ki purani rating minus karke nayi add karein
         double newTotalSum = (currentTotalSum - previousUserRating) + newRating;
 
         updatedRating = newTotalSum / updatedCount;
       } else {
-        // -------------------------------------------------------------
-        // CASE 2: NAYA STUDENT HAI (New Rating)
-        // -------------------------------------------------------------
         updatedCount = currentCount + 1; // Count +1 hoga
 
         if (currentCount == 0 || currentRating == 0.0) {
@@ -443,18 +428,15 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
         }
       }
 
-      // 1 decimal place tak round off (e.g., 4.67 -> 4.7)
       updatedRating = double.parse(updatedRating.toStringAsFixed(1));
 
       debugPrint("Student: $studentId | New Rating: $updatedRating | Count: $updatedCount");
 
-      // 3. Database Updates
       await supabase.from('tutors').update({
         'rating': updatedRating,
         'rating_count': updatedCount,
       }).eq('id', tutorId);
 
-      // 4. Save rating specific to THIS student
       await prefs.setDouble(storageKey, newRating);
 
       if (mounted) {
@@ -612,7 +594,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                               return;
                             }
 
-                            // 1. Tutor Details extract karein (item Map se)
                             final tutorId = item['tutor_id']?.toString() ?? '';
                             final tutorName = item['name']?.toString() ?? 'Tutor';
                             final tutorImage = (item['profile_image'] ??
@@ -627,14 +608,12 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                               return;
                             }
 
-                            // Check context before navigation
                             if (!context.mounted) return;
 
-                            // 2. Chat Screen par Navigate karein
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => StudentChatScreen( // 👈 Apni Chat Screen ka exact widget name yahan likhein
+                                builder: (context) => StudentChatScreen(
                                   receiverId: tutorId,
                                   receiverName: tutorName,
                                 ),
