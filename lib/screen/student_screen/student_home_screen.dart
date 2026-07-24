@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:quran_learning_application/screen/teacher_screen/tutor_call_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../utils/button.dart';
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -44,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       callback: (payload) {
         final newCall = payload.newRecord;
         if (newCall['status'] == 'calling' && mounted) {
-          // 💡 Required named parameters yahan map kiye gaye hain
           _showIncomingCallDialog(
             context: context,
             channelId: newCall['channel_id'] ?? '',
@@ -81,10 +78,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             style: const TextStyle(fontSize: 16),
           ),
           actions: [
-            // ❌ DECLINE BUTTON
             TextButton(
               onPressed: () async {
-                Navigator.of(dialogContext).pop(); // Dialog close
+                Navigator.of(dialogContext).pop();
                 await supabase
                     .from('calls')
                     .update({'status': 'rejected'})
@@ -93,16 +89,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: const Text("Decline", style: TextStyle(color: Colors.red)),
             ),
 
-            // 🟢 ACCEPT BUTTON
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xff0f766e),
               ),
               onPressed: () async {
-                // 1. Dialog ko close karein
                 Navigator.of(dialogContext).pop();
 
-                // 2. Supabase mein call status update karein
                 try {
                   await supabase
                       .from('calls')
@@ -112,7 +105,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   debugPrint("Error updating call status: $e");
                 }
 
-                // 3. Call Screen par Navigate karein
                 if (context.mounted) {
                   Navigator.push(
                     context,
@@ -175,9 +167,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
-// -------------------------------------------------------------
-// MY TUTORS TAB (ACCEPTED INVITES)
-// -------------------------------------------------------------
 class MyTutorsTab extends StatefulWidget {
   const MyTutorsTab({super.key});
 
@@ -211,7 +200,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
 
     if (acceptedInvites.isEmpty) return [];
 
-    // 2. Unique tutor IDs nikalain
     final tutorIds = acceptedInvites
         .map((e) => e['tutor_id']?.toString())
         .where((id) => id != null && id.isNotEmpty)
@@ -220,7 +208,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
 
     if (tutorIds.isEmpty) return [];
 
-    // 3. Tutors ki details fetch karein
     final List<dynamic> tutorsResponse = await supabase
         .from('tutors')
         .select()
@@ -230,7 +217,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
       for (var t in tutorsResponse) t['id'].toString(): Map<String, dynamic>.from(t)
     };
 
-    // 4. Invites aur Tutors data merge karein
     List<Map<String, dynamic>> resultList = [];
     for (var invite in acceptedInvites) {
       final tId = invite['tutor_id']?.toString();
@@ -464,9 +450,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
   }
 }
 
-// -------------------------------------------------------------
-// ALL INVITES TAB (PENDING & REJECTED ONLY)
-// -------------------------------------------------------------
 class StudentInvitesTab extends StatefulWidget {
   const StudentInvitesTab({super.key});
 
@@ -488,7 +471,6 @@ class _StudentInvitesTabState extends State<StudentInvitesTab> {
     final currentStudentId = supabase.auth.currentUser?.id;
     if (currentStudentId == null) return [];
 
-    // Sirf wohi invites fetch hongay jo ACCEPTED nahi hain (yaani pending ya rejected)
     final List<dynamic> invitesResponse = await supabase
         .from('invites')
         .select()
@@ -531,7 +513,6 @@ class _StudentInvitesTabState extends State<StudentInvitesTab> {
     _myInvitesFuture = _fetchInvitesWithTutorDetails();
   }
 
-  // Invite Delete karne ke liye function
   Future<void> _deleteInvite(dynamic inviteId) async {
     try {
       await supabase.from('invites').delete().eq('id', inviteId);
