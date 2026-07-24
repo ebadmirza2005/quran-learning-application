@@ -458,10 +458,10 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                                 builder: (_) => TutorCallScreen(
                                   channelId: channelId,
                                   receiverName: tutorName,
-                                  receiverImage: tutorImage?.toString(), // 👈 2. Yahan String convert karke pass kar dein
+                                  receiverImage: tutorImage?.toString(),
                                 ),
                               ),
-                            );
+                            )
                           } catch (e) {
                             debugPrint("Student Call Error: $e");
 
