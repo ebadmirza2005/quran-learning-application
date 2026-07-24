@@ -9,11 +9,13 @@ import '../../utils/text.dart';
 class TutorCallScreen extends StatefulWidget {
   final String channelId;
   final String receiverName;
+  final String? receiverImage; // 👈 1. Receiver Image URL Add Kiya
 
   const TutorCallScreen({
     super.key,
     required this.channelId,
     required this.receiverName,
+    this.receiverImage, // 👈 Nullable rakha hai taake crash na ho agar image na mile
   });
 
   @override
@@ -21,16 +23,16 @@ class TutorCallScreen extends StatefulWidget {
 }
 
 class _TutorCallScreenState extends State<TutorCallScreen> {
-  final String appId = "34e3961e0a8441218a7c44a6d360f779";
+  final String appId = "093e6c4056be4adf83aa61ce80c98687";
   final SupabaseClient supabase = Supabase.instance.client;
 
-  // Har instance ke liye unique random UID generate karein (Testing ke liye)
   final int myUid = Random().nextInt(1000000) + 1;
 
   int? _remoteUid;
   bool _localUserJoined = false;
   RtcEngine? _engine;
   bool _isMuted = false;
+  bool _isSpeakerOn = true;
   bool _isEndingCall = false;
   RealtimeChannel? _callStatusChannel;
 
@@ -41,24 +43,71 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
     _listenForCallEnd();
   }
 
+  // 1. Supabase Edge Function se Agora Token Fetch Karne Ka Function
+  Future<String?> _fetchAgoraToken() async {
+    try {
+      debugPrint("🚀 Calling Edge Function for Channel: ${widget.channelId}");
+
+      final response = await supabase.functions.invoke(
+        'get-agora-token',
+        body: {
+          'channelName': widget.channelId,
+          'uid': myUid,
+        },
+      );
+
+      debugPrint("📩 Raw Response from Supabase: ${response.data}");
+
+      if (response.data != null) {
+        final token = response.data is Map ? response.data['token'] : response.data;
+        debugPrint("🔑 Final Token: $token");
+        return token.toString();
+      } else {
+        debugPrint("❌ Response data is null");
+        return null;
+      }
+    } catch (e) {
+      debugPrint("❌ Exception fetching token: $e");
+      return null;
+    }
+  }
+
+  // 2. Agora Audio Engine Initialization
   Future<void> initAgora() async {
     try {
-      // 1. Permissions Request
-      await [Permission.microphone, Permission.camera].request();
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.microphone,
+      ].request();
+
+      if (statuses[Permission.microphone] != PermissionStatus.granted) {
+        debugPrint("❌ Microphone Permission Denied");
+        return;
+      }
 
       if (!mounted) return;
 
-      // 2. Engine Creation & Init
+      String? dynamicToken = await _fetchAgoraToken();
+      if (dynamicToken == null || dynamicToken.isEmpty) {
+        debugPrint("❌ Token issue! Cannot proceed.");
+        return;
+      }
+
+      if (_engine != null) {
+        await _engine!.leaveChannel();
+        await _engine!.release();
+        _engine = null;
+      }
+
       _engine = createAgoraRtcEngine();
+
       await _engine!.initialize(RtcEngineContext(
-        appId: appId,
+        appId: appId.trim(),
         channelProfile: ChannelProfileType.channelProfileCommunication,
       ));
 
-      // 3. Register Event Handlers BEFORE joining
       _engine!.registerEventHandler(RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-          debugPrint("✅ Local User Joined with UID: ${connection.localUid}");
+          debugPrint("✅ Local User Joined: ${connection.localUid}");
           if (mounted) {
             setState(() {
               _localUserJoined = true;
@@ -66,7 +115,7 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
           }
         },
         onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
-          debugPrint("🎉 Remote User Joined with UID: $remoteUid");
+          debugPrint("🎉 Remote User Joined: $remoteUid");
           if (mounted) {
             setState(() {
               _remoteUid = remoteUid;
@@ -82,23 +131,24 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
         },
       ));
 
-      // 4. Video & Audio Configuration
-      await _engine!.enableVideo();
       await _engine!.enableAudio();
-      await _engine!.startPreview();
 
-      // 5. Join Channel
       await _engine!.joinChannel(
-        token: '007eJxTYBD9v3GlLMOu/XPFq0ria+PqzxpFTdAQKd3axVDs88Lam0mBwdgk1djSzDDVINHCxMTQyNAi0TzZxCTRLMXYzCDN3Nzy+OnErIZARgb+tdcZGRkgEMRnYShJLS5hYAAAkBodCg==',
-        channelId: 'test',
+        token: dynamicToken,
+        channelId: widget.channelId,
         uid: myUid,
         options: const ChannelMediaOptions(
           clientRoleType: ClientRoleType.clientRoleBroadcaster,
           channelProfile: ChannelProfileType.channelProfileCommunication,
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
         ),
       );
+
+      await _engine!.setEnableSpeakerphone(_isSpeakerOn);
+
     } catch (e) {
-      debugPrint("Error initializing Agora: $e");
+      debugPrint("❌ Error initializing Agora: $e");
     }
   }
 
@@ -174,79 +224,123 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xff121212),
         body: SafeArea(
-          child: Stack(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Main Remote View
-              Center(
-                child: _remoteVideo(),
-              ),
+              const SizedBox(height: 40),
 
-              // Top-Left Local Preview
-              Positioned(
-                top: 20,
-                left: 20,
-                child: Container(
-                  width: 110,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white24, width: 2),
-                    color: Colors.black54,
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: _localUserJoined && _engine != null
-                      ? AgoraVideoView(
-                    controller: VideoViewController(
-                      rtcEngine: _engine!,
-                      canvas: const VideoCanvas(uid: 0),
+              // Call Info Section
+              Column(
+                children: [
+                  // 👈 2. Updated Profile Image Circle
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xff0f766e),
+                      border: Border.all(color: Colors.white24, width: 2),
+                      image: (widget.receiverImage != null && widget.receiverImage!.isNotEmpty)
+                          ? DecorationImage(
+                        image: NetworkImage(widget.receiverImage!),
+                        fit: BoxFit.cover,
+                      )
+                          : null,
                     ),
-                  )
-                      : const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xff0f766e),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Control Buttons
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 40.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: Colors.white24,
-                        child: IconButton(
-                          icon: Icon(
-                            _isMuted ? Icons.mic_off : Icons.mic,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            if (_engine == null) return;
-                            setState(() {
-                              _isMuted = !_isMuted;
-                            });
-                            _engine!.muteLocalAudioStream(_isMuted);
-                          },
+                    child: (widget.receiverImage == null || widget.receiverImage!.isEmpty)
+                        ? Center(
+                      child: Text(
+                        widget.receiverName.isNotEmpty
+                            ? widget.receiverName[0].toUpperCase()
+                            : "U",
+                        style: const TextStyle(
+                          fontSize: 48,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 30),
-                      CircleAvatar(
-                        backgroundColor: Colors.red,
-                        radius: 30,
-                        child: IconButton(
-                          icon: const Icon(Icons.call_end, color: Colors.white, size: 28),
-                          onPressed: _endCall,
-                        ),
-                      ),
-                    ],
+                    )
+                        : null,
                   ),
+                  const SizedBox(height: 20),
+
+                  // Receiver Name (Below Image)
+                  TextWidget(
+                    text: widget.receiverName,
+                    textSize: 22,
+                    textColor: Colors.white,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Call Status
+                  TextWidget(
+                    text: _remoteUid != null
+                        ? "Connected"
+                        : (_localUserJoined
+                        ? "Calling..."
+                        : "Connecting..."),
+                    textSize: 16,
+                    textColor: Colors.white70,
+                  ),
+                ],
+              ),
+
+              // Control Buttons (Mute, End Call, Speaker)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 50.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Mute Button
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: _isMuted ? Colors.white : Colors.white24,
+                      child: IconButton(
+                        icon: Icon(
+                          _isMuted ? Icons.mic_off : Icons.mic,
+                          color: _isMuted ? Colors.black : Colors.white,
+                        ),
+                        onPressed: () {
+                          if (_engine == null) return;
+                          setState(() {
+                            _isMuted = !_isMuted;
+                          });
+                          _engine!.muteLocalAudioStream(_isMuted);
+                        },
+                      ),
+                    ),
+
+                    // End Call Button
+                    CircleAvatar(
+                      backgroundColor: Colors.red,
+                      radius: 32,
+                      child: IconButton(
+                        icon: const Icon(Icons.call_end, color: Colors.white, size: 30),
+                        onPressed: _endCall,
+                      ),
+                    ),
+
+                    // Speaker Button
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: _isSpeakerOn ? Colors.white24 : Colors.white,
+                      child: IconButton(
+                        icon: Icon(
+                          _isSpeakerOn ? Icons.volume_up : Icons.volume_off,
+                          color: _isSpeakerOn ? Colors.white : Colors.black,
+                        ),
+                        onPressed: () {
+                          if (_engine == null) return;
+                          setState(() {
+                            _isSpeakerOn = !_isSpeakerOn;
+                          });
+                          _engine!.setEnableSpeakerphone(_isSpeakerOn);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -254,32 +348,5 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
         ),
       ),
     );
-  }
-
-  Widget _remoteVideo() {
-    if (_remoteUid != null && _engine != null) {
-      return AgoraVideoView(
-        controller: VideoViewController.remote(
-          rtcEngine: _engine!,
-          canvas: VideoCanvas(uid: _remoteUid),
-          connection: RtcConnection(channelId: widget.channelId),
-        ),
-      );
-    } else {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(color: Color(0xff0f766e)),
-          const SizedBox(height: 16),
-          TextWidget(
-            text: _localUserJoined
-                ? "Waiting for ${widget.receiverName}..."
-                : "Connecting...",
-            textSize: 18,
-            textColor: Colors.white,
-          ),
-        ],
-      );
-    }
   }
 }

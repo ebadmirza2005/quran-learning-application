@@ -1105,6 +1105,9 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                               return;
                             }
 
+                            // 👈 1. Student image fetch karein (variable se ya invite Map se)
+                            final studentImageUrl = studentImage ?? invite['student_image'] ?? invite['avatar_url'] ?? invite['profile_image'];
+
                             // Safe fallback if invite['id'] is null
                             final inviteId = invite['id']?.toString() ?? 'no_invite';
                             final channelId = "call_${inviteId}_${DateTime.now().millisecondsSinceEpoch}";
@@ -1128,6 +1131,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                 builder: (context) => TutorCallScreen(
                                   channelId: channelId,
                                   receiverName: studentName,
+                                  receiverImage: studentImageUrl?.toString(), // 👈 2. Yahan receiverImage pass kar diya
                                 ),
                               ),
                             );
