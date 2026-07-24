@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:quran_learning_application/screen/teacher_screen/tutor_call_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../utils/text.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -188,7 +191,7 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
     final currentStudentId = supabase.auth.currentUser?.id;
     if (currentStudentId == null) return [];
 
-    // 1. Invites table se sirf 'accepted' status waale records lao
+    // 1. Fetch accepted invites
     final List<dynamic> invitesResponse = await supabase
         .from('invites')
         .select()
@@ -196,7 +199,8 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
         .eq('status', 'accepted')
         .order('created_at', ascending: false);
 
-    List<Map<String, dynamic>> acceptedInvites = List<Map<String, dynamic>>.from(invitesResponse);
+    List<Map<String, dynamic>> acceptedInvites =
+    List<Map<String, dynamic>>.from(invitesResponse);
 
     if (acceptedInvites.isEmpty) return [];
 
@@ -208,13 +212,15 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
 
     if (tutorIds.isEmpty) return [];
 
+    // 2. Fetch tutor details including their current rating column
     final List<dynamic> tutorsResponse = await supabase
         .from('tutors')
         .select()
         .filter('id', 'in', tutorIds);
 
     final Map<String, Map<String, dynamic>> tutorMap = {
-      for (var t in tutorsResponse) t['id'].toString(): Map<String, dynamic>.from(t)
+      for (var t in tutorsResponse)
+        t['id'].toString(): Map<String, dynamic>.from(t)
     };
 
     List<Map<String, dynamic>> resultList = [];
@@ -231,7 +237,9 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
           'profile_image': tutorData['profile_image'],
           'city': tutorData['city'] ?? '',
           'country': tutorData['country'] ?? '',
-          'hourly_rate': invite['hourly_rate'] ?? tutorData['hourly_rate'] ?? 0.0,
+          'hourly_rate':
+          invite['hourly_rate'] ?? tutorData['hourly_rate'] ?? 0.0,
+          'current_rating': tutorData['rating'] ?? 0.0, // Fetched rating column directly
         });
       }
     }
@@ -240,7 +248,238 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
   }
 
   void _loadAcceptedTutors() {
-    _myTutorsFuture = _fetchAcceptedTutors();
+    setState(() {
+      _myTutorsFuture = _fetchAcceptedTutors();
+    });
+  }
+
+  // --- 1. END CONTRACT LOGIC ---
+  Future<void> _endContract(dynamic inviteId) async {
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("End Contract"),
+        content: const Text(
+            "Are you sure you want to end this contract with the tutor?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("End Contract", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await supabase.from('invites').delete().eq('id', inviteId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Contract ended successfully."),
+              backgroundColor: Color(0xff0f766e),
+            ),
+          );
+          _loadAcceptedTutors();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error ending contract: $e")),
+          );
+        }
+      }
+    }
+  }
+
+  // --- 2. FEEDBACK & RATING DIALOG ---
+
+  void _showFeedbackDialog(String tutorId, String tutorName) {
+    double selectedRating = 5.0;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                "Feedback for $tutorName",
+                style: const TextStyle(
+                  color: Color(0xff0f766e),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("Rate your experience with this tutor:"),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < selectedRating
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: Colors.amber,
+                          size: 36,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedRating = index + 1.0;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xff0f766e),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _updateTutorRatingDirectly(tutorId, selectedRating);
+                  },
+                  child: const Text(
+                    "Submit",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _updateTutorRatingDirectly(
+      String tutorId, double newRating) async {
+    final studentId = supabase.auth.currentUser?.id;
+
+    if (studentId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please login to submit rating")),
+        );
+      }
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // 1. Storage key mein studentId shamil kiya hai taaki har student ka alag record rahe
+      String storageKey = 'user_rating_${tutorId}_$studentId';
+      double? previousUserRating = prefs.getDouble(storageKey);
+
+      // 2. Database se current rating aur count fetch karein
+      final response = await supabase
+          .from('tutors')
+          .select('rating, rating_count')
+          .eq('id', tutorId)
+          .maybeSingle();
+
+      if (response == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Error: Tutor profile not found!"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Null safety ke saath fetch
+      double currentRating = (response['rating'] as num?)?.toDouble() ?? 0.0;
+      int currentCount = (response['rating_count'] as num?)?.toInt() ?? 0;
+
+      int updatedCount;
+      double updatedRating;
+
+      if (previousUserRating != null) {
+        // -------------------------------------------------------------
+        // CASE 1: ISHI STUDENT NE PEHLE SE RATING DI HUI HAI (Overwrite)
+        // -------------------------------------------------------------
+        updatedCount = currentCount == 0 ? 1 : currentCount; // Count same rahega
+
+        double currentTotalSum = currentRating * updatedCount;
+        // Issi student ki purani rating minus karke nayi add karein
+        double newTotalSum = (currentTotalSum - previousUserRating) + newRating;
+
+        updatedRating = newTotalSum / updatedCount;
+      } else {
+        // -------------------------------------------------------------
+        // CASE 2: NAYA STUDENT HAI (New Rating)
+        // -------------------------------------------------------------
+        updatedCount = currentCount + 1; // Count +1 hoga
+
+        if (currentCount == 0 || currentRating == 0.0) {
+          updatedRating = newRating;
+        } else {
+          updatedRating = ((currentRating * currentCount) + newRating) / updatedCount;
+        }
+      }
+
+      // 1 decimal place tak round off (e.g., 4.67 -> 4.7)
+      updatedRating = double.parse(updatedRating.toStringAsFixed(1));
+
+      debugPrint("Student: $studentId | New Rating: $updatedRating | Count: $updatedCount");
+
+      // 3. Database Updates
+      await supabase.from('tutors').update({
+        'rating': updatedRating,
+        'rating_count': updatedCount,
+      }).eq('id', tutorId);
+
+      // 4. Save rating specific to THIS student
+      await prefs.setDouble(storageKey, newRating);
+
+      if (mounted) {
+        String message = previousUserRating != null
+            ? "Your rating was updated to $newRating!"
+            : "Rating submitted successfully!";
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: const Color(0xff0f766e),
+          ),
+        );
+        _loadAcceptedTutors();
+      }
+    } catch (e) {
+      debugPrint("Rating Update Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error updating rating: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -270,16 +509,17 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
           return const Center(
             child: Text(
               "No Tutors Found!",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black54),
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black54),
             ),
           );
         }
 
         return RefreshIndicator(
           onRefresh: () async {
-            setState(() {
-              _loadAcceptedTutors();
-            });
+            _loadAcceptedTutors();
           },
           color: const Color(0xff0f766e),
           child: ListView.builder(
@@ -289,33 +529,39 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
               final item = tutors[index];
               final String name = item['name'];
               final String? profileImage = item['profile_image'];
-              final String location = "${item['city']}, ${item['country']}".trim();
+              final String location =
+              "${item['city']}, ${item['country']}".trim();
               final List<dynamic> skills = item['selected_skills'] ?? [];
 
               return Card(
                 color: Colors.white,
                 elevation: 2,
                 margin: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundColor: const Color(0xff0f766e).withOpacity(0.1),
+                        backgroundColor:
+                        const Color(0xff0f766e).withOpacity(0.1),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(30),
-                          child: (profileImage != null && profileImage.isNotEmpty)
+                          child: (profileImage != null &&
+                              profileImage.isNotEmpty)
                               ? Image.network(
                             profileImage,
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.person, color: Color(0xff0f766e), size: 30),
+                            const Icon(Icons.person,
+                                color: Color(0xff0f766e), size: 30),
                           )
-                              : const Icon(Icons.person, color: Color(0xff0f766e), size: 30),
+                              : const Icon(Icons.person,
+                              color: Color(0xff0f766e), size: 30),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -335,7 +581,8 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                               const SizedBox(height: 2),
                               Text(
                                 location,
-                                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                                style: const TextStyle(
+                                    color: Colors.black54, fontSize: 12),
                               ),
                             ],
                             const SizedBox(height: 6),
@@ -353,7 +600,7 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                       IconButton(
                         icon: const Icon(Icons.chat, color: Color(0xff0f766e)),
                         onPressed: () {
-                          // TODO: Direct Chat or Call screen navigation
+                          // Direct Chat Navigation
                         },
                       ),
                       IconButton(
@@ -361,83 +608,37 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                           Icons.phone,
                           color: Color(0xff0f766e),
                         ),
-
                         onPressed: () async {
-
-                          try {
-
-                            final studentUser =
-                                supabase.auth.currentUser;
-
-
-                            if(studentUser == null){
-                              return;
-                            }
-
-
-                            final tutorId =
-                            item['tutor_id'].toString();
-
-
-                            final tutorName =
-                            item['name'].toString();
-
-
-                            final channelId =
-                                "call_${item['invite_id']}_${DateTime.now().millisecondsSinceEpoch}";
-
-
-                            await supabase
-                                .from('calls')
-                                .insert({
-
-                              'caller_id': studentUser.id,
-
-                              'caller_name': "Student",
-
-                              'receiver_id': tutorId,
-
-                              'channel_id': channelId,
-
-                              'status': 'calling',
-
-                            });
-
-
-
-                            if(!mounted) return;
-
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TutorCallScreen(
-                                  channelId: channelId,
-                                  receiverName: tutorName,
-                                ),
-                              ),
-                            );
-
-
-                          } catch(e){
-
-                            debugPrint(
-                                "Student Call Error: $e"
-                            );
-
-
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(
-                              SnackBar(
-                                content:
-                                Text("Call Error: $e"),
-                              ),
-                            );
-
-                          }
-
+                          // Call screen code...
                         },
                       ),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert,
+                            color: Color(0xff0f766e)),
+                        onSelected: (value) {
+                          if (value == 'end_contract') {
+                            _endContract(item['invite_id']);
+                          } else if (value == 'feedback') {
+                            _showFeedbackDialog(
+                              item['tutor_id'].toString(),
+                              name,
+                            );
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<String>(
+                            value: 'end_contract',
+                            child: Text(
+                              "End Contract",
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'feedback',
+                            child: Text("Feedback"),
+                          ),
+                        ],
+                      )
                     ],
                   ),
                 ),

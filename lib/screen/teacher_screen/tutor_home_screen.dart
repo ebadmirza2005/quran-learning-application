@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             // ❌ DECLINE BUTTON
             TextButton(
               onPressed: () async {
-                Navigator.of(dialogContext).pop(); // Dialog close
+                Navigator.of(dialogContext).pop();
                 await Supabase.instance.client
                     .from('calls')
                     .update({'status': 'rejected'})
@@ -172,7 +172,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: const Text("Decline", style: TextStyle(color: Colors.red)),
             ),
 
-            // 🟢 ACCEPT BUTTON
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xff0f766e),
