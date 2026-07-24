@@ -1035,7 +1035,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              "Learn: ${skills.isNotEmpty ? skills.join(', ') : 'None'}",
+                              "Skills: ${skills.isNotEmpty ? skills.join(', ') : 'None'}",
                               style: const TextStyle(color: Colors.black87),
                             ),
                             const SizedBox(height: 2),
@@ -1045,11 +1045,10 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                             ),
                             Row(
                               children: [
-                                TextWidget(text: "Rate: ",),
-                                TextWidget(text: "\$$rate/hr")
+                                TextWidget(text: "Rate "),
+                                TextWidget(text: " \$$rate/hr"),
                               ],
                             )
-
                           ],
                         ),
                       ),

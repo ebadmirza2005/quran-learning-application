@@ -648,7 +648,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                             final tutorId = item['tutor_id'].toString();
                             final tutorName = item['name'].toString();
 
-                            // 👈 1. Supabase item map se image extract karein
                             final tutorImage = item['profile_image'] ?? item['avatar_url'] ?? item['image'];
 
                             final channelId =
