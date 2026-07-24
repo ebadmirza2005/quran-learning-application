@@ -201,16 +201,13 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
 
   @override
   void dispose() {
-    // NEW: stop listening when the screen is closed
     if (_inviteChannel != null) {
       supabase.removeChannel(_inviteChannel!);
     }
     super.dispose();
   }
 
-  // NEW: listens live for any change to this tutor's invites so the button
-  // (Invite To Teach -> Hiring -> Hired) updates automatically, even if the
-  // tutor accepts/rejects while the student is still on this screen.
+
   void _subscribeToInviteUpdates() {
     final studentId = supabase.auth.currentUser?.id;
     if (studentId == null) return;
@@ -230,7 +227,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
         final newRecord = payload.newRecord;
         final recordStudentId = newRecord['student_id']?.toString();
 
-        // sirf isi student ka invite update honay par react karein
         if (recordStudentId == studentId) {
           final updatedStatus = newRecord['status']?.toString() ?? 'none';
           if (mounted) {
@@ -261,10 +257,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
         .select('status')
         .eq('student_id', studentId)
         .eq('tutor_id', widget.tutorId)
-    // FIX: agar kabhi is student-tutor pair ki multiple invite rows ban jayen
-    // (jaise reject hone ke baad dobara invite bhejne se), to sirf sab se
-    // naya (latest) row uthayen taake .maybeSingle() crash na ho aur status
-    // hamesha sahi (persisted) reflect ho — app band/reopen hone ke baad bhi.
         .order('created_at', ascending: false)
         .limit(1)
         .maybeSingle();
@@ -495,11 +487,7 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     }
 
     try {
-      // FIX: pehle check karein ke is student ka is tutor ke liye pehle se
-      // koi invite row maujood hai (e.g. reject hone ke baad dobara invite
-      // bhej rahe hain). Agar hai to usi row ko update karein — naya row
-      // insert na karein — taake har waqt sirf ek hi status persist ho aur
-      // app band/reopen hone par bhi sahi (Hiring/Hired) dikhe.
+
       final existingInvite = await supabase
           .from('invites')
           .select('id')
@@ -529,15 +517,12 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
 
       if (!mounted) return;
 
-      // FIX: turant button ko "Hiring" per le aayen (realtime update aane tak fallback)
       setState(() {
         inviteStatus = "pending";
       });
 
-      Navigator.of(context).pop(); // sirf invite dialog band karein
+      Navigator.of(context).pop();
 
-      // FIX: ab StudentHomeScreen per navigate nahi karte — student isi profile
-      // screen par rukega taake button "Hiring" -> "Hired" transition dekh sake
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Invitation sent successfully!"),
@@ -611,7 +596,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
 
           return Column(
             children: [
-              // Header Section
               Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
@@ -670,22 +654,40 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        ...List.generate(5, (starIndex) {
-                          double starValue = starIndex + 1.0;
-                          if (averageRating >= starValue) {
-                            return const Icon(Icons.star, color: Colors.amber, size: 18);
-                          } else if (averageRating >= starValue - 0.5) {
-                            return const Icon(Icons.star_half, color: Colors.amber, size: 18);
-                          } else {
-                            return const Icon(Icons.star_border, color: Colors.white70, size: 18);
-                          }
-                        }),
-                        const SizedBox(width: 8),
-                        TextWidget(
-                          text: averageRating.toStringAsFixed(1),
-                          textWeight: FontWeight.bold,
-                          textColor: Colors.white,
-                        )
+                        // 1. Star Rating Logic
+                        Row(
+                          children: List.generate(5, (index) {
+                            // Safe rating extraction
+                            double rating = (tutorData['rating'] as num?)?.toDouble() ?? 0.0;
+                            return Icon(
+                              index < rating.floor()
+                                  ? Icons.star
+                                  : (index < rating ? Icons.star_half : Icons.star_border),
+                              color: Colors.amber,
+                              size: 20,
+                            );
+                          }),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // 2. Rating Text + Count (e.g. 5.0 (1))
+                        Builder(
+                          builder: (context) {
+                            // Double parsing for rating formatting (1 decimal place e.g., 5.0, 4.5)
+                            double ratingVal = (tutorData['rating'] as num?)?.toDouble() ?? 0.0;
+                            // Integer parsing for rating count
+                            int countVal = (tutorData['rating_count'] as num?)?.toInt() ?? 0;
+
+                            return Text(
+                              "${ratingVal.toStringAsFixed(1)} ($countVal)",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                     const SizedBox(height: 15),
@@ -755,7 +757,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Audio Recitation Section
                       TextWidget(
                         text: "Recitation Audio Of Tutor",
                         textSize: 18,

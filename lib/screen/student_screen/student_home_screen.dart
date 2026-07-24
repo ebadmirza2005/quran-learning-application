@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:quran_learning_application/screen/teacher_screen/tutor_call_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../utils/button.dart';
 import 'student_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -45,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       callback: (payload) {
         final newCall = payload.newRecord;
         if (newCall['status'] == 'calling' && mounted) {
-          // 💡 Required named parameters yahan map kiye gaye hain
           _showIncomingCallDialog(
             context: context,
             channelId: newCall['channel_id'] ?? '',
@@ -82,10 +80,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             style: const TextStyle(fontSize: 16),
           ),
           actions: [
-            // ❌ DECLINE BUTTON
             TextButton(
               onPressed: () async {
-                Navigator.of(dialogContext).pop(); // Dialog close
+                Navigator.of(dialogContext).pop();
                 await supabase
                     .from('calls')
                     .update({'status': 'rejected'})
@@ -94,16 +91,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: const Text("Decline", style: TextStyle(color: Colors.red)),
             ),
 
-            // 🟢 ACCEPT BUTTON
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xff0f766e),
               ),
               onPressed: () async {
-                // 1. Dialog ko close karein
                 Navigator.of(dialogContext).pop();
 
-                // 2. Supabase mein call status update karein
                 try {
                   await supabase
                       .from('calls')
@@ -113,7 +107,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   debugPrint("Error updating call status: $e");
                 }
 
-                // 3. Call Screen par Navigate karein
                 if (context.mounted) {
                   Navigator.push(
                     context,
@@ -176,9 +169,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
-// -------------------------------------------------------------
-// MY TUTORS TAB (ACCEPTED INVITES)
-// -------------------------------------------------------------
 class MyTutorsTab extends StatefulWidget {
   const MyTutorsTab({super.key});
 
@@ -200,7 +190,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
     final currentStudentId = supabase.auth.currentUser?.id;
     if (currentStudentId == null) return [];
 
-    // 1. Invites table se sirf 'accepted' status waale records lao
     final List<dynamic> invitesResponse = await supabase
         .from('invites')
         .select()
@@ -208,11 +197,11 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
         .eq('status', 'accepted')
         .order('created_at', ascending: false);
 
-    List<Map<String, dynamic>> acceptedInvites = List<Map<String, dynamic>>.from(invitesResponse);
+    List<Map<String, dynamic>> acceptedInvites =
+    List<Map<String, dynamic>>.from(invitesResponse);
 
     if (acceptedInvites.isEmpty) return [];
 
-    // 2. Unique tutor IDs nikalain
     final tutorIds = acceptedInvites
         .map((e) => e['tutor_id']?.toString())
         .where((id) => id != null && id.isNotEmpty)
@@ -221,17 +210,16 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
 
     if (tutorIds.isEmpty) return [];
 
-    // 3. Tutors ki details fetch karein
     final List<dynamic> tutorsResponse = await supabase
         .from('tutors')
         .select()
         .filter('id', 'in', tutorIds);
 
     final Map<String, Map<String, dynamic>> tutorMap = {
-      for (var t in tutorsResponse) t['id'].toString(): Map<String, dynamic>.from(t)
+      for (var t in tutorsResponse)
+        t['id'].toString(): Map<String, dynamic>.from(t)
     };
 
-    // 4. Invites aur Tutors data merge karein
     List<Map<String, dynamic>> resultList = [];
     for (var invite in acceptedInvites) {
       final tId = invite['tutor_id']?.toString();
@@ -246,7 +234,9 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
           'profile_image': tutorData['profile_image'],
           'city': tutorData['city'] ?? '',
           'country': tutorData['country'] ?? '',
-          'hourly_rate': invite['hourly_rate'] ?? tutorData['hourly_rate'] ?? 0.0,
+          'hourly_rate':
+          invite['hourly_rate'] ?? tutorData['hourly_rate'] ?? 0.0,
+          'current_rating': tutorData['rating'] ?? 0.0, // Fetched rating column directly
         });
       }
     }
@@ -255,7 +245,224 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
   }
 
   void _loadAcceptedTutors() {
-    _myTutorsFuture = _fetchAcceptedTutors();
+    setState(() {
+      _myTutorsFuture = _fetchAcceptedTutors();
+    });
+  }
+
+  Future<void> _endContract(dynamic inviteId) async {
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("End Contract"),
+        content: const Text(
+            "Are you sure you want to end this contract with the tutor?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("End Contract", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await supabase.from('invites').delete().eq('id', inviteId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Contract ended successfully."),
+              backgroundColor: Color(0xff0f766e),
+            ),
+          );
+          _loadAcceptedTutors();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error ending contract: $e")),
+          );
+        }
+      }
+    }
+  }
+
+
+  void _showFeedbackDialog(String tutorId, String tutorName) {
+    double selectedRating = 5.0;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                "Feedback for $tutorName",
+                style: const TextStyle(
+                  color: Color(0xff0f766e),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("Rate your experience with this tutor:"),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < selectedRating
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: Colors.amber,
+                          size: 36,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedRating = index + 1.0;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xff0f766e),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _updateTutorRatingDirectly(tutorId, selectedRating);
+                  },
+                  child: const Text(
+                    "Submit",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _updateTutorRatingDirectly(
+      String tutorId, double newRating) async {
+    final studentId = supabase.auth.currentUser?.id;
+
+    if (studentId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please login to submit rating")),
+        );
+      }
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      String storageKey = 'user_rating_${tutorId}_$studentId';
+      double? previousUserRating = prefs.getDouble(storageKey);
+
+      final response = await supabase
+          .from('tutors')
+          .select('rating, rating_count')
+          .eq('id', tutorId)
+          .maybeSingle();
+
+      if (response == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Error: Tutor profile not found!"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      double currentRating = (response['rating'] as num?)?.toDouble() ?? 0.0;
+      int currentCount = (response['rating_count'] as num?)?.toInt() ?? 0;
+
+      int updatedCount;
+      double updatedRating;
+
+      if (previousUserRating != null) {
+
+        updatedCount = currentCount == 0 ? 1 : currentCount; // Count same rahega
+
+        double currentTotalSum = currentRating * updatedCount;
+        double newTotalSum = (currentTotalSum - previousUserRating) + newRating;
+
+        updatedRating = newTotalSum / updatedCount;
+      } else {
+        updatedCount = currentCount + 1; // Count +1 hoga
+
+        if (currentCount == 0 || currentRating == 0.0) {
+          updatedRating = newRating;
+        } else {
+          updatedRating = ((currentRating * currentCount) + newRating) / updatedCount;
+        }
+      }
+
+      updatedRating = double.parse(updatedRating.toStringAsFixed(1));
+
+      debugPrint("Student: $studentId | New Rating: $updatedRating | Count: $updatedCount");
+
+      await supabase.from('tutors').update({
+        'rating': updatedRating,
+        'rating_count': updatedCount,
+      }).eq('id', tutorId);
+
+      await prefs.setDouble(storageKey, newRating);
+
+      if (mounted) {
+        String message = previousUserRating != null
+            ? "Your rating was updated to $newRating!"
+            : "Rating submitted successfully!";
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: const Color(0xff0f766e),
+          ),
+        );
+        _loadAcceptedTutors();
+      }
+    } catch (e) {
+      debugPrint("Rating Update Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error updating rating: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -285,16 +492,17 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
           return const Center(
             child: Text(
               "No Tutors Found!",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black54),
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black54),
             ),
           );
         }
 
         return RefreshIndicator(
           onRefresh: () async {
-            setState(() {
-              _loadAcceptedTutors();
-            });
+            _loadAcceptedTutors();
           },
           color: const Color(0xff0f766e),
           child: ListView.builder(
@@ -304,33 +512,39 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
               final item = tutors[index];
               final String name = item['name'];
               final String? profileImage = item['profile_image'];
-              final String location = "${item['city']}, ${item['country']}".trim();
+              final String location =
+              "${item['city']}, ${item['country']}".trim();
               final List<dynamic> skills = item['selected_skills'] ?? [];
 
               return Card(
                 color: Colors.white,
                 elevation: 2,
                 margin: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundColor: const Color(0xff0f766e).withOpacity(0.1),
+                        backgroundColor:
+                        const Color(0xff0f766e).withOpacity(0.1),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(30),
-                          child: (profileImage != null && profileImage.isNotEmpty)
+                          child: (profileImage != null &&
+                              profileImage.isNotEmpty)
                               ? Image.network(
                             profileImage,
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.person, color: Color(0xff0f766e), size: 30),
+                            const Icon(Icons.person,
+                                color: Color(0xff0f766e), size: 30),
                           )
-                              : const Icon(Icons.person, color: Color(0xff0f766e), size: 30),
+                              : const Icon(Icons.person,
+                              color: Color(0xff0f766e), size: 30),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -350,12 +564,13 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                               const SizedBox(height: 2),
                               Text(
                                 location,
-                                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                                style: const TextStyle(
+                                    color: Colors.black54, fontSize: 12),
                               ),
                             ],
                             const SizedBox(height: 6),
                             Text(
-                              "Subjects: ${skills.isNotEmpty ? skills.join(', ') : 'All'}",
+                              "Teach: ${skills.isNotEmpty ? skills.join(', ') : 'All'}",
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Colors.black87,
@@ -367,7 +582,7 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.chat, color: Color(0xff0f766e)),
-                        onPressed: () async {
+                        onPressed: () {
                           try {
                             final studentUser = supabase.auth.currentUser;
 
@@ -379,7 +594,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                               return;
                             }
 
-                            // 1. Tutor Details extract karein (item Map se)
                             final tutorId = item['tutor_id']?.toString() ?? '';
                             final tutorName = item['name']?.toString() ?? 'Tutor';
                             final tutorImage = (item['profile_image'] ??
@@ -394,14 +608,12 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                               return;
                             }
 
-                            // Check context before navigation
                             if (!context.mounted) return;
 
-                            // 2. Chat Screen par Navigate karein
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => StudentChatScreen( // 👈 Apni Chat Screen ka exact widget name yahan likhein
+                                builder: (context) => StudentChatScreen(
                                   receiverId: tutorId,
                                   receiverName: tutorName,
                                 ),
@@ -473,6 +685,33 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                           }
                         },
                       ),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert,
+                            color: Color(0xff0f766e)),
+                        onSelected: (value) {
+                          if (value == 'end_contract') {
+                            _endContract(item['invite_id']);
+                          } else if (value == 'feedback') {
+                            _showFeedbackDialog(
+                              item['tutor_id'].toString(),
+                              name,
+                            );
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<String>(
+                            value: 'end_contract',
+                            child: Text(
+                              "End Contract",
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'feedback',
+                            child: Text("Feedback"),
+                          ),
+                        ],
+                      )
                     ],
                   ),
                 ),
@@ -485,9 +724,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
   }
 }
 
-// -------------------------------------------------------------
-// ALL INVITES TAB (PENDING & REJECTED ONLY)
-// -------------------------------------------------------------
 class StudentInvitesTab extends StatefulWidget {
   const StudentInvitesTab({super.key});
 
@@ -509,7 +745,6 @@ class _StudentInvitesTabState extends State<StudentInvitesTab> {
     final currentStudentId = supabase.auth.currentUser?.id;
     if (currentStudentId == null) return [];
 
-    // Sirf wohi invites fetch hongay jo ACCEPTED nahi hain (yaani pending ya rejected)
     final List<dynamic> invitesResponse = await supabase
         .from('invites')
         .select()
@@ -552,7 +787,6 @@ class _StudentInvitesTabState extends State<StudentInvitesTab> {
     _myInvitesFuture = _fetchInvitesWithTutorDetails();
   }
 
-  // Invite Delete karne ke liye function
   Future<void> _deleteInvite(dynamic inviteId) async {
     try {
       await supabase.from('invites').delete().eq('id', inviteId);
