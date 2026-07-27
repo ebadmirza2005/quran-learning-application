@@ -11,6 +11,7 @@ import '../../utils/drop_down_widget.dart';
 import '../../utils/text.dart';
 import 'package:intl/intl.dart';
 
+import '../teacher_screen/tutor_book_slot.dart';
 import '../tutor_home_screen.dart';
 
 class TutorCompleteDetails extends StatefulWidget {
@@ -25,6 +26,7 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
   final supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _certifications = [];
   List<Map<String, dynamic>> _employments = [];
+
 
   List<String> _tutorSkills = [];
   Map<String, bool> selectedSkills = {};
@@ -139,10 +141,8 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
       throw Exception("Tutor Details Not Found For ID: ${widget.tutorId}");
     }
 
-    // FIX: safe numeric cast for hourly_rate (DB may return int, not double)
     _hourlyRate = (tutorData['hourly_rate'] as num?)?.toDouble() ?? 0.0;
 
-    // FIX: removed duplicate assignment, kept a single safe fallback
     _currentTutorName = tutorData['name']?.toString().trim().isNotEmpty == true
         ? tutorData['name'].toString()
         : 'Unknown Tutor';
@@ -192,6 +192,8 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     return tutorData;
   }
 
+
+
   @override
   void initState() {
     super.initState();
@@ -206,7 +208,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     }
     super.dispose();
   }
-
 
   void _subscribeToInviteUpdates() {
     final studentId = supabase.auth.currentUser?.id;
@@ -265,7 +266,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
 
     if (response != null) {
       setState(() {
-        // FIX: safe string fallback instead of a direct dynamic assignment
         inviteStatus = response['status']?.toString() ?? "none";
       });
     } else {
@@ -296,6 +296,7 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
   }
 
   void _showInviteDialog(BuildContext context) {
+
     for (var skill in _tutorSkills) {
       selectedSkills.putIfAbsent(skill, () => false);
     }
@@ -487,7 +488,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
     }
 
     try {
-
       final existingInvite = await supabase
           .from('invites')
           .select('id')
@@ -543,6 +543,8 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isHiredOrHiring = (inviteStatus == "pending" || inviteStatus == "accepted");
+
     return Scaffold(
       backgroundColor: const Color(0xffd2dad2),
       appBar: AppBar(
@@ -586,7 +588,6 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
           final String tutorCity = tutorData['city']?.toString() ?? 'Unknown City';
           final String tutorCountry = tutorData['country']?.toString() ?? 'Unknown Country';
           final String location = '$tutorCity, $tutorCountry';
-          final double averageRating = (tutorData['rating'] as num? ?? 0.0).toDouble();
           final double hourlyRate = (tutorData['hourly_rate'] as num? ?? 0.0).toDouble();
           final String languages = makeDataSafe(tutorData['languages']);
           final int tutorSessions = (tutorData['sessions'] as num?)?.toInt() ?? 0;
@@ -654,10 +655,8 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // 1. Star Rating Logic
                         Row(
                           children: List.generate(5, (index) {
-                            // Safe rating extraction
                             double rating = (tutorData['rating'] as num?)?.toDouble() ?? 0.0;
                             return Icon(
                               index < rating.floor()
@@ -669,13 +668,9 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                           }),
                         ),
                         const SizedBox(width: 6),
-
-                        // 2. Rating Text + Count (e.g. 5.0 (1))
                         Builder(
                           builder: (context) {
-                            // Double parsing for rating formatting (1 decimal place e.g., 5.0, 4.5)
                             double ratingVal = (tutorData['rating'] as num?)?.toDouble() ?? 0.0;
-                            // Integer parsing for rating count
                             int countVal = (tutorData['rating_count'] as num?)?.toInt() ?? 0;
 
                             return Text(
@@ -840,6 +835,7 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                       ),
                       const SizedBox(height: 20),
 
+                      // Employments Section
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -856,98 +852,33 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: _employments.length,
-                                separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
+                                separatorBuilder: (_, __) => const Divider(height: 1),
                                 itemBuilder: (context, index) {
-                                  final item = _employments[index];
-                                  final String company =
-                                  (item['company'] ?? item['organization'] ?? 'Unknown Company').toString();
-                                  final String role =
-                                  (item['role'] ?? item['position'] ?? item['designation'] ?? '').toString();
-
-                                  final startDate = _formatDateString(item['start_date']?.toString() ?? item['from']?.toString());
-                                  final endDate = (item['is_present'] == true || item['is_current'] == true)
+                                  final emp = _employments[index];
+                                  final company = emp['company_name'] ?? emp['company'] ?? 'N/A';
+                                  final role = emp['position'] ?? emp['role'] ?? 'N/A';
+                                  final start = _formatDateString(emp['start_date']);
+                                  final end = emp['is_current'] == true || emp['current'] == true
                                       ? 'Present'
-                                      : _formatDateString(item['end_date']?.toString() ?? item['to']?.toString());
+                                      : _formatDateString(emp['end_date']);
 
-                                  final duration = (startDate.isNotEmpty || endDate.isNotEmpty)
-                                      ? "$startDate - ${endDate.isNotEmpty ? endDate : 'Present'}"
-                                      : '';
-
-                                  final String description =
-                                  (item['description'] ?? item['details'] ?? item['summary'] ?? '').toString();
-
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                company,
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                              ),
-                                            ),
-                                            if (duration.isNotEmpty)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xff0f766e).withOpacity(0.08),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  duration,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Color(0xff0f766e),
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                        if (role.isNotEmpty) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            role,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ],
-                                        if (description.trim().isNotEmpty) ...[
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            description.trim(),
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey.shade700,
-                                              height: 1.3,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
+                                  return ListTile(
+                                    title: Text(role.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: Text("$company ($start - $end)"),
                                   );
                                 },
-                              ),
-                            if (_employments.isEmpty)
+                              )
+                            else
                               const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16.0),
-                                child: Center(
-                                  child: Text("No Employment Record Found!"),
-                                ),
+                                padding: EdgeInsets.all(16.0),
+                                child: Text("No employment history available.", style: TextStyle(color: Colors.grey)),
                               ),
-                            const SizedBox(height: 8),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
+
+                      // Certifications Section
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -957,289 +888,184 @@ class _TutorCompleteDetailsState extends State<TutorCompleteDetails> {
                           shape: const Border(),
                           collapsedShape: const Border(),
                           leading: const Icon(Icons.verified_outlined, color: Color(0xff0f766e)),
-                          title: const Text("Certifications / Ijazah", style: TextStyle(fontWeight: FontWeight.w500)),
+                          title: const Text("Certifications", style: TextStyle(fontWeight: FontWeight.w500)),
                           children: [
                             if (_certifications.isNotEmpty)
                               ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: _certifications.length,
-                                separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
+                                separatorBuilder: (_, __) => const Divider(height: 1),
                                 itemBuilder: (context, index) {
-                                  final item = _certifications[index];
-                                  final String title =
-                                  (item['title'] ?? item['degree'] ?? item['certificate_name'] ?? 'Certification')
-                                      .toString();
-                                  final String issuer =
-                                  (item['issuer'] ?? item['institute'] ?? item['organization'] ?? 'Unknown Institute')
-                                      .toString();
-                                  final year = _formatDateString(
-                                      item['year']?.toString() ?? item['issue_date']?.toString() ?? item['date']?.toString());
-                                  final String details =
-                                  (item['description'] ?? item['details'] ?? item['subject'] ?? item['notes'] ?? '')
-                                      .toString();
-                                  final imageUrl = _getValidImageUrl(item);
+                                  final cert = _certifications[index];
+                                  final title = cert['title'] ?? cert['certificate_name'] ?? 'Certificate';
+                                  final institute = cert['issued_by'] ?? cert['institute'] ?? cert['organization'] ?? '';
+                                  final imageUrl = _getValidImageUrl(cert);
 
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        (imageUrl != null)
-                                            ? GestureDetector(
-                                          onTap: () => _showCertificateImageDialog(imageUrl, title),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Image.network(
-                                              imageUrl,
-                                              width: 52,
-                                              height: 52,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) => Container(
-                                                width: 52,
-                                                height: 52,
-                                                color: Colors.grey.shade200,
-                                                child: const Icon(Icons.workspace_premium, color: Color(0xff0f766e)),
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                            : Container(
-                                          width: 52,
-                                          height: 52,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xff0f766e).withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(Icons.workspace_premium, color: Color(0xff0f766e)),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                title,
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                year.isNotEmpty ? "By $issuer ($year)" : "By $issuer",
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                              if (details.trim().isNotEmpty) ...[
-                                                const SizedBox(height: 6),
-                                                Text(
-                                                  details.trim(),
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey.shade800,
-                                                    height: 1.3,
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                        if (imageUrl != null)
-                                          IconButton(
-                                            icon: const Icon(Icons.visibility, color: Color(0xff0f766e)),
-                                            onPressed: () => _showCertificateImageDialog(imageUrl, title),
-                                          ),
-                                      ],
-                                    ),
+                                  return ListTile(
+                                    title: Text(title.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: institute.toString().isNotEmpty ? Text(institute.toString()) : null,
+                                    trailing: imageUrl != null
+                                        ? IconButton(
+                                      icon: const Icon(Icons.image_outlined, color: Color(0xff0f766e)),
+                                      onPressed: () => _showCertificateImageDialog(imageUrl, title.toString()),
+                                    )
+                                        : null,
                                   );
                                 },
-                              ),
-                            if (_certifications.isEmpty)
+                              )
+                            else
                               const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16.0),
-                                child: Center(
-                                  child: Text("No Certification Found!"),
-                                ),
+                                padding: EdgeInsets.all(16.0),
+                                child: Text("No certifications available.", style: TextStyle(color: Colors.grey)),
                               ),
-                            const SizedBox(height: 8),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      TextWidget(
-                        text: "About Tutor",
-                        textSize: 18,
-                        textWeight: FontWeight.bold,
-                        textColor: const Color(0xff0f766e),
-                      ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
+
+                      // About Section
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          aboutTutor,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            height: 1.4,
-                            color: Colors.black87,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("About", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xff0f766e))),
+                            const SizedBox(height: 8),
+                            Text(aboutTutor, style: const TextStyle(height: 1.4)),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
               ),
+
             ],
           );
         },
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: ElevatedButtonWidget(
-            buttonText: getInviteButtonText(),
-            onTap: () {
-              if (inviteStatus == "pending") {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Invite is waiting for tutor approval")),
-                );
-                return;
-              }
-
-              if (inviteStatus == "accepted") {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("You already hired this tutor")),
-                );
-                return;
-              }
-
-              _showInviteDialog(context);
-            },
-            buttonColor:  inviteStatus == "pending" || inviteStatus == "accepted" ? Colors.grey : Color(0xff0f766e),
-            textColor: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class TutorVideoPlayer extends StatefulWidget {
-  final String tutorVideo;
-  final double height;
-
-  const TutorVideoPlayer({
-    super.key,
-    required this.tutorVideo,
-    this.height = 170,
-  });
-
-  @override
-  State<TutorVideoPlayer> createState() => _TutorVideoPlayerState();
-}
-
-class _TutorVideoPlayerState extends State<TutorVideoPlayer> {
-  late VideoPlayerController _videoPlayerController;
-  ChewieController? _chewieController;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializePlayer();
-  }
-
-  Future<void> _initializePlayer() async {
-    try {
-      _videoPlayerController = VideoPlayerController.networkUrl(
-        Uri.parse(widget.tutorVideo),
-      );
-
-      await _videoPlayerController.initialize();
-
-      // FIX: guard against calling setState after the widget is disposed
-      if (!mounted) return;
-
-      _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController,
-        aspectRatio: 16 / 9,
-        autoPlay: false,
-        looping: false,
-        allowFullScreen: true,
-        allowMuting: true,
-        errorBuilder: (context, errorMessage) {
-          return const Center(
-            child: Text(
-              "Failed to load video.",
-              style: TextStyle(color: Colors.white),
-            ),
-          );
-        },
-      );
-
-      setState(() {});
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _hasError = true;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _videoPlayerController.dispose();
-    _chewieController?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_hasError) {
-      return Container(
-        height: 200,
-        width: double.infinity,
-        color: Colors.black12,
-        child: const Center(
-          child: Text(
-            "Error loading video",
-            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-          ),
-        ),
-      );
-    }
-
-    if (_chewieController != null &&
-        _chewieController!.videoPlayerController.value.isInitialized) {
-      return Container(
-        width: double.infinity,
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Chewie(controller: _chewieController!),
+        child: isHiredOrHiring
+            ? Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xff0f766e),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TutorBookSlot(
+                          tutorId: widget.tutorId,
+                          isAlreadyHired: true,
+                        ),
+                      ),
+                    );
+                    if (result == true) {
+                      setState(() {});
+                    }
+                  },
+                  child: const Text(
+                    "Book Slot",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 12,),
+            Expanded(
+              child: Container(
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xff0f766e).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xff0f766e)),
+                ),
+                child: Text(
+                  getInviteButtonText(),
+                  style: const TextStyle(
+                    color: Color(0xff0f766e),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        )
+            : SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xff0f766e),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TutorBookSlot(
+                    tutorId: widget.tutorId,
+                    isAlreadyHired: false,
+                  ),
+                ),
+              );
+              if (result == true) {
+                setState(() {
+                });
+              }
+            },
+            child: checkingInvite
+                ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+                : Text(
+              getInviteButtonText(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
-      );
-    }
-
-    return Container(
-      height: 200,
-      width: double.infinity,
-      color: Colors.black12,
-      child: const Center(
-        child: CircularProgressIndicator(color: Color(0xff0f766e)),
       ),
     );
   }
@@ -1247,7 +1073,6 @@ class _TutorVideoPlayerState extends State<TutorVideoPlayer> {
 
 class TutorAudioPlayer extends StatefulWidget {
   final String tutorAudioUrl;
-
   const TutorAudioPlayer({super.key, required this.tutorAudioUrl});
 
   @override
@@ -1255,145 +1080,43 @@ class TutorAudioPlayer extends StatefulWidget {
 }
 
 class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
-  late ja.AudioPlayer _audioPlayer;
+  final ja.AudioPlayer _audioPlayer = ja.AudioPlayer();
   bool _isPlaying = false;
+  bool _isLoading = true;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
-  bool _isLoading = false;
-  bool _isSourceSet = false;
-  bool _hasError = false;
-  String _errorMessage = "Failed to load audio track";
 
   @override
   void initState() {
     super.initState();
-    _audioPlayer = ja.AudioPlayer();
-    _setupAudioListeners();
+    _initAudio();
   }
 
-  void _setupAudioListeners() {
-    _audioPlayer.playerStateStream.listen((state) {
-      if (!mounted) return;
-
-      final isBuffering = state.processingState == ja.ProcessingState.loading ||
-          state.processingState == ja.ProcessingState.buffering;
-
-      setState(() {
-        _isPlaying = state.playing;
-        _isLoading = isBuffering;
-
-        if (state.processingState == ja.ProcessingState.completed) {
-          _position = Duration.zero;
-          _isPlaying = false;
-          _audioPlayer.seek(Duration.zero);
-          _audioPlayer.pause();
-        }
-      });
-    });
-
-    _audioPlayer.durationStream.listen((newDuration) {
-      if (mounted && newDuration != null && newDuration != Duration.zero) {
-        setState(() {
-          _duration = newDuration;
-        });
-      }
-    });
-
-    _audioPlayer.positionStream.listen((newPosition) {
-      if (mounted) {
-        setState(() {
-          _position = newPosition;
-        });
-      }
-    });
-  }
-
-  Future<void> _toggleAudio() async {
+  Future<void> _initAudio() async {
     try {
-      if (_isPlaying) {
-        await _audioPlayer.pause();
-        return;
-      }
-
-      if (_isSourceSet) {
-        await _audioPlayer.play();
-        return;
-      }
-
-      final String rawUrl = widget.tutorAudioUrl.trim();
-      final String lowerUrl = rawUrl.toLowerCase();
-
-      bool isValidFormat = lowerUrl.endsWith('.mp3') ||
-          lowerUrl.endsWith('.m4a') ||
-          lowerUrl.endsWith('.aac') ||
-          lowerUrl.endsWith('.wav');
-
-      if (!isValidFormat) {
-        if (!mounted) return;
-        setState(() {
-          _hasError = true;
-          _isLoading = false;
-          _errorMessage = "Unsupported format. Only MP3, M4A, AAC, and WAV are allowed.";
-        });
-        return;
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
+      await _audioPlayer.setUrl(widget.tutorAudioUrl);
+      _audioPlayer.durationStream.listen((d) {
+        if (mounted && d != null) setState(() => _duration = d);
       });
-
-      final Uri audioUri = Uri.parse(rawUrl);
-
-      try {
-        final duration = await _audioPlayer.setAudioSource(
-          ja.AudioSource.uri(audioUri),
-          preload: true,
-        );
-
+      _audioPlayer.positionStream.listen((p) {
+        if (mounted) setState(() => _position = p);
+      });
+      _audioPlayer.playerStateStream.listen((state) {
         if (mounted) {
           setState(() {
-            if (duration != null) _duration = duration;
-            _isLoading = false;
-            _isSourceSet = true;
+            _isPlaying = state.playing;
+            if (state.processingState == ja.ProcessingState.completed) {
+              _position = Duration.zero;
+              _audioPlayer.seek(Duration.zero);
+              _audioPlayer.pause();
+            }
           });
         }
-        await _audioPlayer.play();
-        return;
-      } catch (streamError) {
-        debugPrint("Direct stream failed, attempting local fallback: $streamError");
-      }
-
-      final response = await http.get(audioUri);
-
-      if (response.statusCode == 200) {
-        final tempDir = await getTemporaryDirectory();
-        // FIX: use a unique filename per audio URL to avoid stale cached files
-        final fileName = 'temp_audio_${rawUrl.hashCode}.mp3';
-        final file = File('${tempDir.path}/$fileName');
-        await file.writeAsBytes(response.bodyBytes);
-
-        final duration = await _audioPlayer.setFilePath(file.path);
-        if (mounted) {
-          setState(() {
-            if (duration != null) _duration = duration;
-            _isLoading = false;
-            _isSourceSet = true;
-          });
-        }
-        await _audioPlayer.play();
-      } else {
-        throw Exception("Failed to download audio file");
-      }
+      });
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _hasError = true;
-          _isLoading = false;
-          _errorMessage = "Unable to play audio: ${e.toString()}";
-        });
-      }
+      debugPrint("Audio init error: $e");
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -1405,84 +1128,139 @@ class _TutorAudioPlayerState extends State<TutorAudioPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    if (_hasError) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.red.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.red.shade200),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                _errorMessage,
-                style: const TextStyle(color: Colors.red, fontSize: 12),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
         children: [
           IconButton(
-            icon: _isLoading
-                ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Color(0xff0f766e),
-              ),
-            )
-                : Icon(
+            icon: Icon(
               _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
-              size: 36,
+              size: 40,
               color: const Color(0xff0f766e),
             ),
-            onPressed: _toggleAudio,
+            onPressed: _isLoading
+                ? null
+                : () {
+              if (_isPlaying) {
+                _audioPlayer.pause();
+              } else {
+                _audioPlayer.play();
+              }
+            },
           ),
           Expanded(
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                trackHeight: 4,
+            child: Slider(
+              activeColor: const Color(0xff0f766e),
+              inactiveColor: Colors.grey.shade300,
+              min: 0.0,
+              max: _duration.inMilliseconds.toDouble() > 0
+                  ? _duration.inMilliseconds.toDouble()
+                  : 1.0,
+              value: _position.inMilliseconds.toDouble().clamp(
+                0.0,
+                _duration.inMilliseconds.toDouble() > 0
+                    ? _duration.inMilliseconds.toDouble()
+                    : 1.0,
               ),
-              child: Slider(
-                activeColor: const Color(0xff0f766e),
-                inactiveColor: Colors.grey.shade300,
-                min: 0.0,
-                max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
-                value: _position.inMilliseconds.toDouble().clamp(
-                  0.0,
-                  _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
-                ),
-                onChanged: (value) {
-                  _audioPlayer.seek(Duration(milliseconds: value.toInt()));
-                },
-              ),
+              onChanged: (val) {
+                _audioPlayer.seek(Duration(milliseconds: val.toInt()));
+              },
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Video Player Widget Helper
+// ---------------------------------------------------------------------------
+class TutorVideoPlayer extends StatefulWidget {
+  final String tutorVideo;
+  final double height;
+
+  const TutorVideoPlayer({
+    super.key,
+    required this.tutorVideo,
+    this.height = 250,
+  });
+
+  @override
+  State<TutorVideoPlayer> createState() => _TutorVideoPlayerState();
+}
+
+class _TutorVideoPlayerState extends State<TutorVideoPlayer> {
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPlayer();
+  }
+
+  Future<void> _initPlayer() async {
+    try {
+      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.tutorVideo));
+      await _videoPlayerController!.initialize();
+
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController!,
+        aspectRatio: _videoPlayerController!.value.aspectRatio,
+        autoPlay: false,
+        looping: false,
+        errorBuilder: (context, errorMessage) {
+          return const Center(
+            child: Text(
+              "Error playing video",
+              style: TextStyle(color: Colors.white),
+            ),
+          );
+        },
+      );
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint("Video init error: $e");
+      if (mounted) setState(() => _hasError = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoPlayerController?.dispose();
+    _chewieController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError) {
+      return Container(
+        height: widget.height,
+        color: Colors.black12,
+        child: const Center(child: Text("Could not load video")),
+      );
+    }
+
+    if (_chewieController != null &&
+        _chewieController!.videoPlayerController.value.isInitialized) {
+      return SizedBox(
+        height: widget.height,
+        child: Chewie(controller: _chewieController!),
+      );
+    }
+
+    return Container(
+      height: widget.height,
+      color: Colors.black12,
+      child: const Center(
+        child: CircularProgressIndicator(color: Color(0xff0f766e)),
       ),
     );
   }

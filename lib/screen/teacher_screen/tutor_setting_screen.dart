@@ -8,6 +8,7 @@ import 'tutor_change_password_screen.dart';
 import 'tutor_edit_info.dart';
 import 'tutor_location_screen.dart';
 import 'tutor_personal_info.dart';
+import 'tutor_time_logs.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -121,7 +122,7 @@ class _SettingScreenState extends State<SettingScreen> {
                   ],
                 ),
 
-                SizedBox(height: _height * 0.1,),
+                SizedBox(height: _height * 0.01,),
                 Column(
                   children: [
                     Row(
@@ -154,6 +155,15 @@ class _SettingScreenState extends State<SettingScreen> {
                     const SizedBox(height: 10,),
                     Row(
                       children: [
+                        const Icon(Icons.menu_book, color: Color(0xff0f766e),),
+                        TextButtonWidget(buttonText: "Schedule", onTap: () {
+                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorAvailability()));
+                        },)
+                      ],
+                    ),
+                    const SizedBox(height: 10,),
+                    Row(
+                      children: [
                         Icon(Icons.lock, color: Color(0xff0f766e),),
                         TextButtonWidget(buttonText: "Change Password", onTap: () {
                           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorChangePasswordScreen()));
@@ -178,7 +188,7 @@ class _SettingScreenState extends State<SettingScreen> {
                     ),
                   ],
                 ),
-                SizedBox(height: _height * 0.1,),
+                const SizedBox(height: 10,),
                 Column(
                   children: [
                     ElevatedButtonWidget(

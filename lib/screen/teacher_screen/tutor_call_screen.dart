@@ -43,7 +43,6 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
     _listenForCallEnd();
   }
 
-  // 1. Fetch Agora Token from Edge Function
   Future<String?> _fetchAgoraToken() async {
     try {
       debugPrint("🚀 Calling Edge Function for Channel: ${widget.channelId}");
@@ -67,7 +66,6 @@ class _TutorCallScreenState extends State<TutorCallScreen> {
     }
   }
 
-  // 2. Agora Audio Engine Initialization
   Future<void> initAgora() async {
     try {
       Map<Permission, PermissionStatus> statuses = await [

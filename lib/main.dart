@@ -21,6 +21,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: const Color(0xff0f766e),
+      ),
       debugShowCheckedModeBanner: false,
       title: 'Tutor App',
       home: SplashScreen(),
