@@ -23,8 +23,10 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
   final supabase = Supabase.instance.client;
 
   String? selectedSlotId;
+  Map<String, dynamic>? selectedSlotData; // 👈 Store selected slot object
   bool isBooking = false;
-  bool isFirstTimeTrial = true; // 🟢 Free Trial status check
+  bool isFirstTimeTrial = true;
+  bool isLoadingTutorData = true;
 
   final List<String> _weekDays = [
     "Monday",
@@ -53,27 +55,66 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     _fetchTutorDetailsAndTrialStatus();
   }
 
-  // 🔄 Fetch tutor info + Check if user qualifies for Free Trial
+  // 🕒 Helper Function: Free Trial ke liye start time se 30 minutes add karne ke liye
+  String _calculateTrialEndTime(String startTimeStr) {
+    try {
+      String cleanTime = startTimeStr.trim().toUpperCase();
+      DateTime parsedTime;
+
+      if (cleanTime.contains('AM') || cleanTime.contains('PM')) {
+        parsedTime = DateFormat("h:mm a").parse(cleanTime);
+      } else {
+        parsedTime = DateFormat("HH:mm").parse(cleanTime);
+      }
+
+      // 30 Minutes Add karein
+      DateTime endTime = parsedTime.add(const Duration(minutes: 30));
+      return DateFormat("h:mm a").format(endTime);
+    } catch (e) {
+      return startTimeStr; // Fallback agar parsing error ho
+    }
+  }
+
+  // 🔄 Fetch Tutor Details & Trial Eligibility
   Future<void> _fetchTutorDetailsAndTrialStatus() async {
     try {
       final user = supabase.auth.currentUser;
 
-      // 1. Fetch tutor details
-      final res = await supabase
-          .from('tutors')
-          .select('full_name, skills, hourly_rate')
-          .eq('id', widget.tutorId)
-          .maybeSingle();
+      debugPrint("Fetching details for Tutor ID: ${widget.tutorId}");
+
+      dynamic res;
+      try {
+        res = await supabase
+            .from('tutors')
+            .select('*')
+            .eq('id', widget.tutorId)
+            .maybeSingle();
+      } catch (e) {
+        res = await supabase
+            .from('tutors')
+            .select('*')
+            .eq('user_id', widget.tutorId)
+            .maybeSingle();
+      }
 
       if (res != null && mounted) {
         setState(() {
-          _currentTutorName = res['full_name'] ?? 'Tutor';
-          _tutorSkills = List<String>.from(res['skills'] ?? []);
-          _hourlyRate = (res['hourly_rate'] ?? 0).toDouble();
+          _currentTutorName = res['full_name'] ?? res['name'] ?? res['tutor_name'] ?? 'Tutor';
+
+          if (res['skills'] != null) {
+            if (res['skills'] is List) {
+              _tutorSkills = List<String>.from(res['skills'].map((item) => item.toString()));
+            } else if (res['skills'] is String) {
+              _tutorSkills = (res['skills'] as String).split(',').map((e) => e.trim()).toList();
+            }
+          }
+
+          final rawRate = res['hourly_rate'] ?? res['rate'] ?? res['price_per_hour'] ?? 0;
+          _hourlyRate = double.tryParse(rawRate.toString()) ?? 0.0;
         });
       }
 
-      // 2. Check if student has already taken any booking/invite before
+      // Check Free Trial Eligibility
       if (user != null) {
         final previousInvites = await supabase
             .from('invites')
@@ -85,23 +126,26 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
 
         if (mounted) {
           setState(() {
-            // Agar pehle invite maujood hai toh Free trial nahi hoga
             isFirstTimeTrial = (previousInvites == null) && !widget.isAlreadyHired;
 
             if (isFirstTimeTrial) {
               selectedDuration = "30 Minutes (Free Trial)";
             } else {
-              selectedDuration = "1 Hour"; // Default paid duration
+              selectedDuration = "1 Hour";
             }
           });
         }
       }
     } catch (e) {
-      debugPrint("Error fetching trial status: $e");
+      debugPrint("❌ Supabase Tutor Fetch Error: $e");
+    } finally {
+      if (mounted) {
+        setState(() => isLoadingTutorData = false);
+      }
     }
   }
 
-  // 🟢 DIRECT SLOT BOOKING (When already hired)
+  // 🟢 DIRECT SLOT BOOKING (Already Hired Context)
   Future<void> _bookDirectSlot() async {
     if (selectedSlotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -139,7 +183,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
 
       Navigator.pop(context, true);
     } catch (e) {
-      debugPrint("Booking Error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Booking failed: $e"), backgroundColor: Colors.red),
@@ -150,7 +193,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     }
   }
 
-  // 🟢 INVITE SUBMIT WITH FREE TRIAL SUPPORT
+  // 🟢 SUBMIT FREE TRIAL / INVITATION
   Future<void> _submitBookingAndInvite() async {
     final currentStudentId = supabase.auth.currentUser?.id;
     if (currentStudentId == null) return;
@@ -170,18 +213,16 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     setState(() => isBooking = true);
 
     try {
-      // Step A: Booking Table Entry
       final bookingRes = await supabase.from('bookings').insert({
         'student_id': currentStudentId,
         'tutor_id': widget.tutorId,
         'slot_id': selectedSlotId,
         'status': 'pending',
-        'is_trial': isFirstTimeTrial, // 🟢 Mark if this is a trial booking
+        'is_trial': isFirstTimeTrial,
         'created_at': DateTime.now().toIso8601String(),
       }).select().single();
 
-      // Step B: Invite Table Entry
-      final actualRate = isFirstTimeTrial ? 0.0 : _hourlyRate; // $0 for trial
+      final actualRate = isFirstTimeTrial ? 0.0 : _hourlyRate;
 
       await supabase.from('invites').insert({
         'tutor_id': widget.tutorId,
@@ -196,21 +237,20 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
 
       if (!mounted) return;
 
-      Navigator.of(context).pop(); // Close Dialog
-      Navigator.of(context).pop(true); // Close Page
+      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isFirstTimeTrial
-                ? "Free Trial Invite Sent Successfully!"
+                ? "🎁 Free Trial Claimed & Request Sent!"
                 : "Slot Booked and Invitation Sent!",
           ),
           backgroundColor: const Color(0xff0f766e),
         ),
       );
     } catch (e) {
-      debugPrint("Error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Action failed: $e"), backgroundColor: Colors.red),
@@ -221,9 +261,8 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     }
   }
 
-  // 🟢 CONTRACT DIALOG WITH FREE TRIAL BADGE
   void _showInviteDialog() {
-    if (selectedSlotId == null) {
+    if (selectedSlotId == null || selectedSlotData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Please select an available slot first!"),
@@ -237,21 +276,20 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
       selectedSkills.putIfAbsent(skill, () => false);
     }
 
+    String slotStartTime = selectedSlotData!['start_time'] ?? 'N/A';
+    String fullSlotEndTime = selectedSlotData!['end_time'] ?? 'N/A';
+
+    // ⚡ Agar Free Trial hai to 30 min add honge, nahi to regular end time rahega
+    String displayEndTime = isFirstTimeTrial
+        ? _calculateTrialEndTime(slotStartTime)
+        : fullSlotEndTime;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            DateTime now = DateTime.now();
-            String formattedDate = DateFormat("EEE, MMM d, yyyy").format(now);
-            String formattedTime = DateFormat('hh:mm a').format(now);
-
-            // Free Trial duration is locked to 30 mins
-            int minutesToAdd = isFirstTimeTrial ? 30 : 60;
-            DateTime endTime = now.add(Duration(minutes: minutesToAdd));
-            String formattedEndTime = DateFormat('hh:mm a').format(endTime);
-
             Widget buildSkillItem(String skillName) {
               return Row(
                 mainAxisSize: MainAxisSize.min,
@@ -281,14 +319,15 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 🟢 Header Row with Free Trial Badge
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: TextWidget(
-                              text: "Contract of $_currentTutorName",
-                              textSize: 18,
+                              text: isFirstTimeTrial
+                                  ? "Claim Free Trial Slot"
+                                  : "Contract of $_currentTutorName",
+                              textSize: 16,
                               textWeight: FontWeight.bold,
                               textColor: const Color(0xff0f766e),
                             ),
@@ -302,7 +341,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                                 border: Border.all(color: const Color(0xff0f766e)),
                               ),
                               child: const Text(
-                                "🎁 FREE TRIAL",
+                                "🎁 100% FREE",
                                 style: TextStyle(
                                   color: Color(0xff0f766e),
                                   fontWeight: FontWeight.bold,
@@ -315,21 +354,18 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          TextWidget(text: "Date: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
+                          TextWidget(text: "Day: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
                           const SizedBox(width: 3),
-                          TextWidget(text: formattedDate),
+                          TextWidget(text: selectedDay),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          TextWidget(text: "Time: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
+                          TextWidget(text: "Slot Time: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
                           const SizedBox(width: 3),
-                          TextWidget(text: formattedTime),
-                          const SizedBox(width: 5),
-                          TextWidget(text: "To"),
-                          const SizedBox(width: 5),
-                          TextWidget(text: formattedEndTime),
+                          // 👈 Updated: Displays 30 min end time for trial, full time otherwise
+                          TextWidget(text: "$slotStartTime - $displayEndTime"),
                         ],
                       ),
                       const SizedBox(height: 15),
@@ -340,7 +376,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                       ),
                       const SizedBox(height: 8),
 
-                      // 🟢 Duration Selection (Disabled / Auto-Set for Free Trial)
                       isFirstTimeTrial
                           ? Container(
                         width: double.infinity,
@@ -352,10 +387,10 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.timer_outlined, color: Color(0xff0f766e), size: 20),
+                            Icon(Icons.stars_rounded, color: Color(0xff0f766e), size: 22),
                             SizedBox(width: 8),
                             Text(
-                              "30 Minutes (Free Trial)",
+                              "30 Minutes (Free Trial Lesson)",
                               style: TextStyle(
                                 color: Color(0xff0f766e),
                                 fontWeight: FontWeight.bold,
@@ -401,7 +436,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                         Row(
                           children: [
                             TextWidget(
-                              text: "Contract Rate: ",
+                              text: "Total Amount: ",
                               textWeight: FontWeight.bold,
                               textColor: const Color(0xff0f766e),
                             ),
@@ -418,17 +453,15 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButtonWidget(
+                            child: TextButtonWidget(
                               buttonText: "Cancel",
-                              buttonColor: Colors.grey.shade400,
-                              textColor: Colors.white,
+                              textColor: const Color(0xff0f766e),
                               onTap: () => Navigator.of(context).pop(),
                             ),
                           ),
-                          const SizedBox(width: 10),
                           Expanded(
                             child: ElevatedButtonWidget(
-                              buttonText: isFirstTimeTrial ? "Start Free Trial" : "Send Invite",
+                              buttonText: isFirstTimeTrial ? "Free Trial" : "Send Invite",
                               buttonColor: const Color(0xff0f766e),
                               textColor: Colors.white,
                               onTap: _submitBookingAndInvite,
@@ -500,12 +533,47 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
         backgroundColor: const Color(0xff0f766e),
         foregroundColor: Colors.white,
         title: TextWidget(
-          text: widget.isAlreadyHired ? "Book Extra Slot" : "Book Availability Slot",
+          text: widget.isAlreadyHired
+              ? "Book Extra Slot"
+              : (isFirstTimeTrial ? "Claim Free Trial Slot" : "Book Availability Slot"),
         ),
         centerTitle: true,
       ),
       body: Column(
         children: [
+          // 🎁 FREE TRIAL PROMO BANNER AT TOP
+          if (!isLoadingTutorData && isFirstTimeTrial && !widget.isAlreadyHired)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              color: const Color(0xff0f766e).withOpacity(0.1),
+              child: Row(
+                children: [
+                  const Icon(Icons.card_giftcard_rounded, color: Color(0xff0f766e), size: 24),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(color: Colors.black87, fontSize: 13),
+                        children: [
+                          const TextSpan(text: "First time with "),
+                          TextSpan(
+                            text: _currentTutorName.isNotEmpty ? _currentTutorName : "this tutor",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const TextSpan(text: "? Your first "),
+                          const TextSpan(
+                            text: "30-minute trial is 100% Free!",
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xff0f766e)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Days List
           Container(
             color: Colors.white,
@@ -528,11 +596,13 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                       selected: isSelected,
                       selectedColor: const Color(0xff0f766e),
                       backgroundColor: Colors.grey.shade100,
+                      checkmarkColor: Colors.white,
                       onSelected: (bool selected) {
                         if (selected) {
                           setState(() {
                             selectedDay = day;
                             selectedSlotId = null;
+                            selectedSlotData = null; // Reset selection
                           });
                         }
                       },
@@ -593,7 +663,12 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                       ),
                       child: ListTile(
                         enabled: !isPassed,
-                        onTap: isPassed ? null : () => setState(() => selectedSlotId = slotId),
+                        onTap: isPassed
+                            ? null
+                            : () => setState(() {
+                          selectedSlotId = slotId;
+                          selectedSlotData = item; // 👈 Save selected slot object
+                        }),
                         leading: CircleAvatar(
                           backgroundColor: isPassed
                               ? Colors.grey.shade400
@@ -614,7 +689,10 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                           value: slotId,
                           groupValue: selectedSlotId,
                           activeColor: const Color(0xff0f766e),
-                          onChanged: (value) => setState(() => selectedSlotId = value),
+                          onChanged: (value) => setState(() {
+                            selectedSlotId = value;
+                            selectedSlotData = item;
+                          }),
                         ),
                       ),
                     );
@@ -624,7 +702,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
             ),
           ),
 
-          // Bottom Action Button
           Container(
             padding: const EdgeInsets.all(16.0),
             color: Colors.white,
@@ -650,7 +727,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                     : Text(
                   widget.isAlreadyHired
                       ? "Confirm Booking"
-                      : (isFirstTimeTrial ? "Claim Free Trial (30 Mins)" : "Proceed to Invite"),
+                      : (isFirstTimeTrial ? "🎁 Claim Free Trial (30 Mins)" : "Proceed to Invite"),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),

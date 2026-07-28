@@ -633,6 +633,55 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
     }
   }
 
+  Future<void> _deleteInvite(dynamic inviteId) async {
+    // 🛑 Confirmation Dialog before Delete
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Invitation"),
+        content: const Text("Are you sure you want to remove this invite?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await supabase.from('invites').delete().eq('id', inviteId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Invite removed successfully!"),
+            backgroundColor: Color(0xff0f766e),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        setState(() {
+          _loadInvites(); // 👈 Fixed method call
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to delete invite: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<List<Map<String, dynamic>>> _fetchInvitesWithStudentProfiles(String tutorId) async {
     final List<dynamic> response = await supabase
         .from('invites')
@@ -644,8 +693,6 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
     List<Map<String, dynamic>> invites = List<Map<String, dynamic>>.from(response);
 
     for (var invite in invites) {
-      debugPrint("INVITE RECORD: $invite");
-
       final studentId = invite['student_id'] ??
           invite['sender_id'] ??
           invite['user_id'] ??
@@ -660,16 +707,11 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
               .maybeSingle();
 
           if (studentData != null) {
-            debugPrint("FETCHED STUDENT DATA: $studentData");
             invite['student_profile'] = studentData;
-          } else {
-            debugPrint("No student found in 'students' table with ID: $studentId");
           }
         } catch (e) {
           debugPrint("Error fetching student details: $e");
         }
-      } else {
-        debugPrint("No student_id column found in invite record!");
       }
     }
 
@@ -723,10 +765,11 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
           },
           color: const Color(0xff0f766e),
           child: ListView.builder(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             itemCount: invites.length,
             itemBuilder: (context, index) {
               final invite = invites[index];
+              final inviteId = invite['id']; // 👈 Fixed invite ID reference
 
               final studentProfile = invite['student_profile'] as Map<String, dynamic>?;
 
@@ -743,161 +786,210 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
               final List<dynamic> skills = invite['selected_skills'] ?? [];
               final String duration = invite['duration']?.toString() ?? 'N/A';
               final String status = invite['status']?.toString() ?? 'pending';
-              final double rate = (invite['hourly_rate'] as num? ?? 0.0).toDouble();
 
-              return Card(
-                color: Colors.white,
-                elevation: 2,
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(14.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              final rawRate = invite['hourly_rate'] ?? invite['rate'] ?? invite['price'] ?? 0;
+              final double rate = double.tryParse(rawRate.toString()) ?? 0.0;
+
+              final bool isTrial = invite['is_trial'] == true || (rate == 0.0);
+
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Card(
+                    color: Colors.white,
+                    elevation: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    const TextWidget(
+                                      text: "Student: ",
+                                      textWeight: FontWeight.bold,
+                                      textColor: Color(0xff0f766e),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: TextWidget(
+                                        text: studentName,
+                                        textWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: status == 'pending'
+                                      ? const Color(0xff0f766e).withOpacity(0.15)
+                                      : const Color(0xffeb5757).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  status.toUpperCase(),
+                                  style: TextStyle(
+                                    color: status == 'pending'
+                                        ? const Color(0xff0f766e).withOpacity(0.8)
+                                        : const Color(0xffeb5757).withOpacity(0.8),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 15), // Close button spacing
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
                           Row(
                             children: [
                               const TextWidget(
-                                text: "Student: ",
+                                text: "Duration: ",
                                 textWeight: FontWeight.bold,
                                 textColor: Color(0xff0f766e),
                               ),
-                              SizedBox(width: 8,),
-                              TextWidget(
-                                text: studentName,
-                                textWeight: FontWeight.w600,
-                              ),
+                              const SizedBox(width: 4),
+                              TextWidget(text: duration, textWeight: FontWeight.w600),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: status == 'pending'
-                                  ? Color(0xff0f766e).withOpacity(0.15)
-                                  : Color(0xffeb5757).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              status.toUpperCase(),
-                              style: TextStyle(
-                                color: status == 'pending'
-                                    ? Color(0xff0f766e).withOpacity(0.8)
-                                    : Color(0xffeb5757).withOpacity(0.8),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
+                          const SizedBox(height: 10),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text: "Skills: ",
+                                  style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold),
+                                ),
+                                const WidgetSpan(child: SizedBox(width: 6)),
+                                TextSpan(
+                                  text: skills.isNotEmpty ? skills.join(', ') : 'None',
+                                  style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+                                ),
+                              ],
                             ),
                           ),
+                          const SizedBox(height: 10),
+
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text: "Rate: ",
+                                  style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold),
+                                ),
+                                const WidgetSpan(child: SizedBox(width: 6)),
+                                TextSpan(
+                                  text: isTrial ? "🎁 FREE (Trial Lesson)" : "\$${rate.toStringAsFixed(2)} / hour",
+                                  style: TextStyle(
+                                    color: isTrial ? Colors.green.shade700 : Colors.black87,
+                                    fontWeight: isTrial ? FontWeight.bold : FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          if (status == 'pending') ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Colors.red),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    try {
+                                      await supabase
+                                          .from('invites')
+                                          .update({'status': 'rejected'})
+                                          .eq('id', inviteId);
+                                      if (mounted) {
+                                        setState(() {
+                                          _loadInvites();
+                                        });
+                                      }
+                                    } catch (e) {
+                                      debugPrint("Reject error: $e");
+                                    }
+                                  },
+                                  child: const Text("Reject", style: TextStyle(color: Colors.red)),
+                                ),
+                                const SizedBox(width: 10),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xff0f766e),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    try {
+                                      await supabase
+                                          .from('invites')
+                                          .update({'status': 'accepted'})
+                                          .eq('id', inviteId);
+                                      if (mounted) {
+                                        setState(() {
+                                          _loadInvites();
+                                        });
+                                      }
+                                    } catch (e) {
+                                      debugPrint("Accept error: $e");
+                                    }
+                                  },
+                                  child: const Text("Accept", style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 10),
-
-                      Row(
-                        children: [
-                          TextWidget(text: "Duration: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
-                          SizedBox(width: 4,),
-                          TextWidget(text: duration, textWeight: FontWeight.w600),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            const TextSpan(
-                              text: "Skills: ",
-                              style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold),
-                            ),
-                            WidgetSpan(child: SizedBox(width: 6,)),
-                            TextSpan(
-                              text: skills.isNotEmpty ? skills.join(', ') : 'None',
-                              style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Rate Section
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            const TextSpan(
-                              text: "Rate: ",
-                              style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.w600),
-                            ),
-                            WidgetSpan(child: SizedBox(width: 6,)),
-                            TextSpan(
-                              text: "\$$rate / hour",
-                              style: const TextStyle(color: Colors.black87),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Accept / Reject Buttons
-                      if (status == 'pending') ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Colors.red),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: () async {
-                                try {
-                                  await supabase
-                                      .from('invites')
-                                      .update({'status': 'rejected'})
-                                      .eq('id', invite['id']);
-                                  if (mounted) {
-                                    setState(() {
-                                      _loadInvites();
-                                    });
-                                  }
-                                } catch (e) {
-                                  debugPrint("Reject error: $e");
-                                }
-                              },
-                              child: const Text("Reject", style: TextStyle(color: Colors.red)),
-                            ),
-                            const SizedBox(width: 10),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xff0f766e),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: () async {
-                                try {
-                                  await supabase
-                                      .from('invites')
-                                      .update({'status': 'accepted'})
-                                      .eq('id', invite['id']);
-                                  if (mounted) {
-                                    setState(() {
-                                      _loadInvites();
-                                    });
-                                  }
-                                } catch (e) {
-                                  debugPrint("Accept error: $e");
-                                }
-                              },
-                              child: const Text("Accept", style: TextStyle(color: Colors.white)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
-                ),
+
+                  // 🔴 Delete Close Icon at Top Right
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: () => _deleteInvite(inviteId),
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: const Color(0xff0f766e),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
           ),
@@ -906,7 +998,6 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
     );
   }
 }
-
 class StudentsTabWidget extends StatefulWidget {
   const StudentsTabWidget({super.key});
 
@@ -1071,12 +1162,17 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
               (studentInfo?['profile_image'] ?? studentInfo?['avatar_url'])?.toString();
               final List<dynamic> skills = invite['selected_skills'] ?? [];
               final String duration = invite['duration']?.toString() ?? 'N/A';
-              final String rate = (invite['hourly_rate'] as num? ?? 0.0).toStringAsFixed(1);
+
+              // 🟢 Safe rate parsing with column fallbacks
+              final rawRate = invite['hourly_rate'] ?? invite['rate'] ?? invite['price'] ?? 0;
+              final double parsedRate = double.tryParse(rawRate.toString()) ?? 0.0;
+
+              // 🎁 Free Trial check
+              final bool isTrial = invite['is_trial'] == true || (parsedRate == 0.0);
 
               return Stack(
-                clipBehavior: Clip.none, // Cross button ko border clip hone se bachane ke liye
+                clipBehavior: Clip.none,
                 children: [
-                  // Main Card Component
                   Card(
                     color: Colors.white,
                     elevation: 2,
@@ -1108,14 +1204,16 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                     fontSize: 16,
                                     color: Color(0xff0f766e),
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    TextWidget(
+                                    const TextWidget(
                                       text: "Learn:  ",
                                       textWeight: FontWeight.bold,
-                                      textColor: const Color(0xff0f766e),
+                                      textColor: Color(0xff0f766e),
                                     ),
                                     Expanded(
                                       child: TextWidget(
@@ -1125,24 +1223,39 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                   ],
                                 ),
                                 const SizedBox(height: 2),
+
                                 Row(
                                   children: [
-                                    TextWidget(
+                                    const TextWidget(
                                       text: "Duration:  ",
                                       textWeight: FontWeight.bold,
-                                      textColor: const Color(0xff0f766e),
+                                      textColor: Color(0xff0f766e),
                                     ),
-                                    TextWidget(text: duration),
+                                    Expanded(
+                                      child: Text(
+                                        duration,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                   ],
                                 ),
+                                const SizedBox(height: 2),
+
                                 Row(
                                   children: [
-                                    TextWidget(
+                                    const TextWidget(
                                       text: "Rate:  ",
                                       textWeight: FontWeight.bold,
-                                      textColor: const Color(0xff0f766e),
+                                      textColor: Color(0xff0f766e),
                                     ),
-                                    TextWidget(text: "\$$rate/hr"),
+                                    TextWidget(
+                                      text: isTrial
+                                          ? "🎁 FREE (Trial)"
+                                          : "\$${parsedRate.toStringAsFixed(2)}/hr",
+                                      textColor: isTrial ? Colors.green.shade700 : Colors.black87,
+                                      textWeight: isTrial ? FontWeight.bold : FontWeight.normal,
+                                    ),
                                   ],
                                 ),
                               ],
@@ -1195,7 +1308,6 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                   return;
                                 }
 
-                                // 🔴 1. Student Image Fallback Check
                                 final studentImageUrl = studentImage ??
                                     invite['student_image'] ??
                                     invite['avatar_url'] ??
@@ -1205,7 +1317,6 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                 final inviteId = invite['id']?.toString() ?? 'no_invite';
                                 final channelId = "call_${inviteId}_${DateTime.now().millisecondsSinceEpoch}";
 
-                                // 🔴 2. Tutor Profile Data Fetching with Column Fallbacks
                                 final tutorProfile = await supabase
                                     .from('tutors')
                                     .select('*')
@@ -1216,17 +1327,15 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                     tutorProfile?['full_name'] ??
                                     "Tutor";
 
-                                // Multiple fallback checks for Tutor Image column names
                                 final String? tutorImage = tutorProfile?['caller_image'] ??
                                     tutorProfile?['profile_image'] ??
                                     tutorProfile?['image'] ??
                                     tutorProfile?['photo'];
 
-                                // 🔴 3. Insert into Supabase Calls table
                                 await supabase.from('calls').insert({
                                   'caller_id': tutorUser.id,
                                   'caller_name': tutorName,
-                                  'caller_image': tutorImage, // 👈 Ensures image URL is passed correctly
+                                  'caller_image': tutorImage,
                                   'receiver_id': studentId,
                                   'channel_id': channelId,
                                   'status': 'calling',
@@ -1276,24 +1385,38 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              title: Center(child: const TextWidget(text: "End Contract", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),)),
+                              title: const Center(
+                                child: TextWidget(
+                                  text: "End Contract",
+                                  textWeight: FontWeight.bold,
+                                  textColor: Color(0xff0f766e),
+                                ),
+                              ),
                               content: Text(
                                 "Ending this contract will terminate your teaching sessions with $studentName and remove your classroom access for this student. Do you wish to proceed?",
                               ),
                               actions: [
                                 Row(
                                   children: [
-                                    Expanded(child: ElevatedButtonWidget(buttonText: "No",
+                                    Expanded(
+                                      child: ElevatedButtonWidget(
+                                        buttonText: "No",
                                         textColor: Colors.white,
-                                        buttonColor: Color(0xff0f766e),
-                                        onTap: () => Navigator.of(dialogContext).pop(false))),
-                                    SizedBox(width: 10,),
-                                    Expanded(child: ElevatedButtonWidget(buttonText: "Yes",
-                                        buttonColor: Color(0xff0f766e),
+                                        buttonColor: const Color(0xff0f766e),
+                                        onTap: () => Navigator.of(dialogContext).pop(false),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: ElevatedButtonWidget(
+                                        buttonText: "Yes",
+                                        buttonColor: const Color(0xff0f766e),
                                         textColor: Colors.white,
                                         onTap: () {
                                           Navigator.of(dialogContext).pop(true);
-                                    },))
+                                        },
+                                      ),
+                                    )
                                   ],
                                 )
                               ],
@@ -1303,7 +1426,6 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
 
                         if (shouldEnd != true) return;
 
-                        // 2. Supabase DB update / end contract logic execute karein
                         try {
                           final inviteId = invite['id'];
 
@@ -1315,7 +1437,6 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                             return;
                           }
 
-                          // Show loading dialog
                           if (context.mounted) {
                             showDialog(
                               context: context,
@@ -1326,15 +1447,13 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                             );
                           }
 
-                          // Option A: Status update karna (Recommended practice)
                           await supabase
-                              .from('invites') // Aapki contract/invites table ka naam
+                              .from('invites')
                               .update({'status': 'ended'})
                               .eq('id', inviteId);
 
-
                           if (!context.mounted) return;
-                          Navigator.pop(context); // Close loading indicator
+                          Navigator.pop(context); // Close loading dialog
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -1342,7 +1461,10 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                               backgroundColor: Color(0xff0f766e),
                             ),
                           );
-                          // onRefresh();
+
+                          setState(() {
+                            _loadStudents();
+                          });
 
                         } catch (e) {
                           debugPrint("END CONTRACT ERROR: $e");
@@ -1362,7 +1484,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                         width: 26,
                         height: 26,
                         decoration: BoxDecoration(
-                          color: Color(0xff0f766e),
+                          color: const Color(0xff0f766e),
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.grey.shade300, width: 1.2),
                           boxShadow: [

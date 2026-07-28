@@ -188,6 +188,31 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
     _loadAcceptedTutors();
   }
 
+  // Enhanced rate parser to handle any key, num, string, or currency symbols
+  double _parseRate(Map<String, dynamic> invite, Map<String, dynamic> tutor) {
+    final dynamic rawRate = invite['hourly_rate'] ??
+        invite['rate'] ??
+        invite['price'] ??
+        invite['tutor_rate'] ??
+        tutor['hourly_rate'] ??
+        tutor['rate'] ??
+        tutor['price'] ??
+        tutor['tutor_rate'] ??
+        tutor['fee'];
+
+    if (rawRate == null) return 0.0;
+
+    if (rawRate is num) return rawRate.toDouble();
+
+    if (rawRate is String) {
+      // Strips out currency symbols or text e.g. "$25/hr" -> "25"
+      final String cleanStr = rawRate.replaceAll(RegExp(r'[^0-9.]'), '');
+      return double.tryParse(cleanStr) ?? 0.0;
+    }
+
+    return 0.0;
+  }
+
   Future<List<Map<String, dynamic>>> _fetchAcceptedTutors() async {
     final currentStudentId = supabase.auth.currentUser?.id;
     if (currentStudentId == null) return [];
@@ -227,6 +252,15 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
       final tId = invite['tutor_id']?.toString();
       if (tId != null && tutorMap.containsKey(tId)) {
         var tutorData = tutorMap[tId]!;
+
+        final double calculatedRate = _parseRate(invite, tutorData);
+
+        // Debug prints to verify exact database values in console
+        debugPrint("--- RATE DEBUG ---");
+        debugPrint("Invite raw rate fields: ${invite['hourly_rate']} | ${invite['rate']}");
+        debugPrint("Tutor raw rate fields: ${tutorData['hourly_rate']} | ${tutorData['rate']}");
+        debugPrint("Parsed Rate Result: $calculatedRate");
+
         resultList.add({
           'invite_id': invite['id'],
           'selected_skills': invite['selected_skills'],
@@ -236,9 +270,8 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
           'profile_image': tutorData['profile_image'],
           'city': tutorData['city'] ?? '',
           'country': tutorData['country'] ?? '',
-          'hourly_rate':
-          invite['hourly_rate'] ?? tutorData['hourly_rate'] ?? 0.0,
-          'current_rating': tutorData['rating'] ?? 0.0, // Fetched rating column directly
+          'hourly_rate': calculatedRate,
+          'current_rating': tutorData['rating'] ?? 0.0,
         });
       }
     }
@@ -257,23 +290,35 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
       barrierDismissible: false,
       context: context,
       builder: (context) => AlertDialog(
-        title: Center(child: const TextWidget(text: "End Contract", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),)),
+        title: Center(
+            child: const TextWidget(
+              text: "End Contract",
+              textWeight: FontWeight.bold,
+              textColor: Color(0xff0f766e),
+            )),
         content: const Text(
             "Terminating this contract will discontinue your scheduled sessions with this tutor. You will no longer be able to join their classroom. Do you wish to proceed?"),
         actions: [
           Row(
             children: [
-              Expanded(child: ElevatedButtonWidget(buttonText: "No",
-                  textColor: Colors.white,
-                  buttonColor: Color(0xff0f766e),
-                  onTap: () => Navigator.of(context).pop(false))),
-              SizedBox(width: 10,),
-              Expanded(child: ElevatedButtonWidget(buttonText: "Yes",
-                buttonColor: Color(0xff0f766e),
-                textColor: Colors.white,
-                onTap: () {
-                  Navigator.of(context).pop(true);
-                },))
+              Expanded(
+                  child: ElevatedButtonWidget(
+                      buttonText: "No",
+                      textColor: Colors.white,
+                      buttonColor: const Color(0xff0f766e),
+                      onTap: () => Navigator.of(context).pop(false))),
+              const SizedBox(
+                width: 10,
+              ),
+              Expanded(
+                  child: ElevatedButtonWidget(
+                    buttonText: "Yes",
+                    buttonColor: const Color(0xff0f766e),
+                    textColor: Colors.white,
+                    onTap: () {
+                      Navigator.of(context).pop(true);
+                    },
+                  ))
             ],
           )
         ],
@@ -302,7 +347,6 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
       }
     }
   }
-
 
   void _showFeedbackDialog(String tutorId, String tutorName) {
     double selectedRating = 5.0;
@@ -420,26 +464,27 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
       double updatedRating;
 
       if (previousUserRating != null) {
-
-        updatedCount = currentCount == 0 ? 1 : currentCount; // Count same rahega
+        updatedCount = currentCount == 0 ? 1 : currentCount;
 
         double currentTotalSum = currentRating * updatedCount;
         double newTotalSum = (currentTotalSum - previousUserRating) + newRating;
 
         updatedRating = newTotalSum / updatedCount;
       } else {
-        updatedCount = currentCount + 1; // Count +1 hoga
+        updatedCount = currentCount + 1;
 
         if (currentCount == 0 || currentRating == 0.0) {
           updatedRating = newRating;
         } else {
-          updatedRating = ((currentRating * currentCount) + newRating) / updatedCount;
+          updatedRating =
+              ((currentRating * currentCount) + newRating) / updatedCount;
         }
       }
 
       updatedRating = double.parse(updatedRating.toStringAsFixed(1));
 
-      debugPrint("Student: $studentId | New Rating: $updatedRating | Count: $updatedCount");
+      debugPrint(
+          "Student: $studentId | New Rating: $updatedRating | Count: $updatedCount");
 
       await supabase.from('tutors').update({
         'rating': updatedRating,
@@ -524,6 +569,8 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
               final String duration = item['duration'] ?? 'N/A';
               final double rate = (item['hourly_rate'] as num?)?.toDouble() ?? 0.0;
               final List<dynamic> skills = item['selected_skills'] ?? [];
+              final double parsedRate = double.tryParse(rate.toString()) ?? 0.0;
+              final bool isTrial = item['is_trial'] == true || (rate == 0.0);
 
               return Card(
                 color: Colors.white,
@@ -541,8 +588,7 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                         const Color(0xff0f766e).withOpacity(0.1),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(30),
-                          child: (profileImage != null &&
-                              profileImage.isNotEmpty)
+                          child: (profileImage != null && profileImage.isNotEmpty)
                               ? Image.network(
                             profileImage,
                             width: 60,
@@ -568,26 +614,60 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                                 fontSize: 16,
                                 color: Color(0xff0f766e),
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                TextWidget(text: "Teach:  ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
-                                TextWidget(text: skills.isNotEmpty ? skills.join(', ') : 'All')
+                                const TextWidget(
+                                  text: "Teach:  ",
+                                  textWeight: FontWeight.bold,
+                                  textColor: Color(0xff0f766e),
+                                ),
+                                Expanded(
+                                  child: TextWidget(
+                                    text: skills.isNotEmpty
+                                        ? skills.join(', ')
+                                        : 'All',
+                                  ),
+                                ),
                               ],
                             ),
                             Row(
                               children: [
-                                TextWidget(text: "Duration:  ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
-                                TextWidget(text: duration,)
+                                const TextWidget(
+                                  text: "Duration:  ",
+                                  textWeight: FontWeight.bold,
+                                  textColor: Color(0xff0f766e),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    duration,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ],
                             ),
                             Row(
                               children: [
-                                TextWidget(text: "Rate:  ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
-                                TextWidget(text: '\$$rate / hour',)
+                                const TextWidget(
+                                  text: "Rate:  ",
+                                  textWeight: FontWeight.bold,
+                                  textColor: Color(0xff0f766e),
+                                ),
+                                Expanded(
+                                  child: TextWidget(
+                                    text: isTrial
+                                        ? "🎁 FREE (Trial)"
+                                        : "\$${parsedRate.toStringAsFixed(2)}/hr",
+                                    textColor: isTrial ? Colors.green.shade700 : Colors.black87,
+                                    textWeight: isTrial ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
                               ],
-                            )
+                            ),
                           ],
                         ),
                       ),
@@ -600,21 +680,21 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                             if (studentUser == null) {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Please login to start chat")),
+                                const SnackBar(
+                                    content: Text("Please login to start chat")),
                               );
                               return;
                             }
 
                             final tutorId = item['tutor_id']?.toString() ?? '';
-                            final tutorName = item['name']?.toString() ?? 'Tutor';
-                            final tutorImage = (item['profile_image'] ??
-                                item['avatar_url'] ??
-                                item['image'])?.toString();
+                            final tutorName =
+                                item['name']?.toString() ?? 'Tutor';
 
                             if (tutorId.isEmpty) {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Invalid Tutor ID")),
+                                const SnackBar(
+                                    content: Text("Invalid Tutor ID")),
                               );
                               return;
                             }
@@ -658,27 +738,25 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
 
                             final tutorId = item['tutor_id'].toString();
                             final tutorName = item['name'].toString();
-                            final tutorImage = item['profile_image'] ?? item['avatar_url'] ?? item['image'];
+                            final tutorImage = item['profile_image'] ??
+                                item['avatar_url'] ??
+                                item['image'];
 
-                            // 🔴 1. Current Student ki Profile (Name & Image) 'students' table se fetch karein
                             final studentProfile = await supabase
-                                .from('students') // Aapki students table
+                                .from('students')
                                 .select('name, profile_image')
                                 .eq('id', studentUser.id)
                                 .maybeSingle();
 
-                            final String studentName = studentProfile?['name'] ??
-                                'Student';
-
-                            final String? studentImage = studentProfile?['profile_image'];
+                            final String studentName =
+                                studentProfile?['name'] ?? 'Student';
 
                             final channelId =
                                 "call_${item['invite_id']}_${DateTime.now().millisecondsSinceEpoch}";
 
-                            // 🔴 2. 'calls' table mein actual caller_name aur caller_image save karein
                             await supabase.from('calls').insert({
                               'caller_id': studentUser.id,
-                              'caller_name': studentName,        // 👈 Hardcoded 'Student' ki jagah actual name
+                              'caller_name': studentName,
                               'receiver_id': tutorId,
                               'channel_id': channelId,
                               'status': 'calling',
@@ -724,11 +802,19 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                         itemBuilder: (context) => [
                           const PopupMenuItem<String>(
                             value: 'end_contract',
-                            child: TextWidget(text: "End Contract", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                            child: TextWidget(
+                              text: "End Contract",
+                              textWeight: FontWeight.bold,
+                              textColor: Color(0xff0f766e),
+                            ),
                           ),
                           const PopupMenuItem<String>(
                             value: 'feedback',
-                            child: TextWidget(text: "Feedback", textWeight: FontWeight.bold, textColor: Color(0xff0f766e),),
+                            child: TextWidget(
+                              text: "Feedback",
+                              textWeight: FontWeight.bold,
+                              textColor: Color(0xff0f766e),
+                            ),
                           ),
                         ],
                       )
