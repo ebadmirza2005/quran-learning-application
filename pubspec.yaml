@@ -31,6 +31,7 @@ dependencies:
   path_provider: ^2.1.6
   just_audio: ^0.10.6
   agora_rtc_engine: ^6.5.4
+  firebase_core: ^4.12.1
 
 dev_dependencies:
   flutter_test:
