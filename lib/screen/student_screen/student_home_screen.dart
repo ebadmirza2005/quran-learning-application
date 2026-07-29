@@ -519,6 +519,8 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Map<String, dynamic>>>(
@@ -571,6 +573,114 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
               final List<dynamic> skills = item['selected_skills'] ?? [];
               final double parsedRate = double.tryParse(rate.toString()) ?? 0.0;
               final bool isTrial = item['is_trial'] == true || (rate == 0.0);
+
+              void navigateToChatScreen() {
+                try {
+                  final studentUser = supabase.auth.currentUser;
+
+                  if (studentUser == null) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text("Please login to start chat")),
+                    );
+                    return;
+                  }
+
+                  final tutorId = item['tutor_id']?.toString() ?? '';
+                  final tutorName =
+                      item['name']?.toString() ?? 'Tutor';
+
+                  if (tutorId.isEmpty) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text("Invalid Tutor ID")),
+                    );
+                    return;
+                  }
+
+                  if (!context.mounted) return;
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StudentChatScreen(
+                        receiverId: tutorId,
+                        receiverName: tutorName,
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  debugPrint("Chat Navigation Error: $e");
+
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Error opening chat: $e"),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
+              }
+
+              void navigateToCallScreen() async {
+                try {
+                  final studentUser = supabase.auth.currentUser;
+
+                  if (studentUser == null) {
+                    return;
+                  }
+
+                  final tutorId = item['tutor_id'].toString();
+                  final tutorName = item['name'].toString();
+                  final tutorImage = item['profile_image'] ??
+                      item['avatar_url'] ??
+                      item['image'];
+
+                  final studentProfile = await supabase
+                      .from('students')
+                      .select('name, profile_image')
+                      .eq('id', studentUser.id)
+                      .maybeSingle();
+
+                  final String studentName =
+                      studentProfile?['name'] ?? 'Student';
+
+                  final channelId =
+                      "call_${item['invite_id']}_${DateTime.now().millisecondsSinceEpoch}";
+
+                  await supabase.from('calls').insert({
+                    'caller_id': studentUser.id,
+                    'caller_name': studentName,
+                    'receiver_id': tutorId,
+                    'channel_id': channelId,
+                    'status': 'calling',
+                  });
+
+                  if (!mounted) return;
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TutorCallScreen(
+                        channelId: channelId,
+                        receiverName: tutorName,
+                        receiverImage: tutorImage?.toString(),
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  debugPrint("Student Call Error: $e");
+
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Call Error: $e"),
+                    ),
+                  );
+                }
+              }
 
               return Card(
                 color: Colors.white,
@@ -671,126 +781,15 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                           ],
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.chat, color: Color(0xff0f766e)),
-                        onPressed: () {
-                          try {
-                            final studentUser = supabase.auth.currentUser;
-
-                            if (studentUser == null) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text("Please login to start chat")),
-                              );
-                              return;
-                            }
-
-                            final tutorId = item['tutor_id']?.toString() ?? '';
-                            final tutorName =
-                                item['name']?.toString() ?? 'Tutor';
-
-                            if (tutorId.isEmpty) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text("Invalid Tutor ID")),
-                              );
-                              return;
-                            }
-
-                            if (!context.mounted) return;
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => StudentChatScreen(
-                                  receiverId: tutorId,
-                                  receiverName: tutorName,
-                                ),
-                              ),
-                            );
-                          } catch (e) {
-                            debugPrint("Chat Navigation Error: $e");
-
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("Error opening chat: $e"),
-                                backgroundColor: Colors.redAccent,
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.phone,
-                          color: Color(0xff0f766e),
-                        ),
-                        onPressed: () async {
-                          try {
-                            final studentUser = supabase.auth.currentUser;
-
-                            if (studentUser == null) {
-                              return;
-                            }
-
-                            final tutorId = item['tutor_id'].toString();
-                            final tutorName = item['name'].toString();
-                            final tutorImage = item['profile_image'] ??
-                                item['avatar_url'] ??
-                                item['image'];
-
-                            final studentProfile = await supabase
-                                .from('students')
-                                .select('name, profile_image')
-                                .eq('id', studentUser.id)
-                                .maybeSingle();
-
-                            final String studentName =
-                                studentProfile?['name'] ?? 'Student';
-
-                            final channelId =
-                                "call_${item['invite_id']}_${DateTime.now().millisecondsSinceEpoch}";
-
-                            await supabase.from('calls').insert({
-                              'caller_id': studentUser.id,
-                              'caller_name': studentName,
-                              'receiver_id': tutorId,
-                              'channel_id': channelId,
-                              'status': 'calling',
-                            });
-
-                            if (!mounted) return;
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TutorCallScreen(
-                                  channelId: channelId,
-                                  receiverName: tutorName,
-                                  receiverImage: tutorImage?.toString(),
-                                ),
-                              ),
-                            );
-                          } catch (e) {
-                            debugPrint("Student Call Error: $e");
-
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("Call Error: $e"),
-                              ),
-                            );
-                          }
-                        },
-                      ),
                       PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert,
                             color: Color(0xff0f766e)),
                         onSelected: (value) {
-                          if (value == 'end_contract') {
+                          if (value == 'message') {
+                            navigateToChatScreen();
+                          } else if (value == 'call') {
+                            navigateToCallScreen();
+                          } else if (value == 'end_contract') {
                             _endContract(item['invite_id']);
                           } else if (value == 'feedback') {
                             _showFeedbackDialog(
@@ -801,19 +800,59 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                         },
                         itemBuilder: (context) => [
                           const PopupMenuItem<String>(
+                            value: 'message',
+                            child: Row(
+                              children: [
+                                Icon(Icons.chat, color: Color(0xff0f766e), size: 22),
+                                SizedBox(width: 10,),
+                                TextWidget(
+                                  text: "Message",
+                                  textWeight: FontWeight.bold,
+                                  textColor: Color(0xff0f766e),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'call',
+                            child: Row(
+                              children: [
+                                Icon(Icons.call, color: Color(0xff0f766e), size: 22),
+                                SizedBox(width: 10,),
+                                TextWidget(
+                                  text: "Call",
+                                  textWeight: FontWeight.bold,
+                                  textColor: Color(0xff0f766e),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
                             value: 'end_contract',
-                            child: TextWidget(
-                              text: "End Contract",
-                              textWeight: FontWeight.bold,
-                              textColor: Color(0xff0f766e),
+                            child: Row(
+                              children: [
+                                Icon(Icons.description, color: Color(0xff0f766e), size: 22),
+                                SizedBox(width: 10,),
+                                TextWidget(
+                                  text: "End Contract",
+                                  textWeight: FontWeight.bold,
+                                  textColor: Color(0xff0f766e),
+                                ),
+                              ],
                             ),
                           ),
                           const PopupMenuItem<String>(
                             value: 'feedback',
-                            child: TextWidget(
-                              text: "Feedback",
-                              textWeight: FontWeight.bold,
-                              textColor: Color(0xff0f766e),
+                            child: Row(
+                              children: [
+                                Icon(Icons.feedback, color: Color(0xff0f766e), size: 22),
+                                SizedBox(width: 10,),
+                                TextWidget(
+                                  text: "Feedback",
+                                  textWeight: FontWeight.bold,
+                                  textColor: Color(0xff0f766e),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -972,6 +1011,7 @@ class _StudentInvitesTabState extends State<StudentInvitesTab> {
               final double rate = (invite['hourly_rate'] as num? ?? 0.0).toDouble();
               final List<dynamic> skills = invite['selected_skills'] ?? [];
               final inviteId = invite['id'];
+              final bool isTrial = invite['is_trial'] == true || (rate == 0.0);
 
               return Stack(
                 children: [
@@ -1042,7 +1082,10 @@ class _StudentInvitesTabState extends State<StudentInvitesTab> {
                             text: TextSpan(
                               children: [
                                 const TextSpan(text: "Rate: ", style: TextStyle(color: Color(0xff0f766e), fontWeight: FontWeight.bold)),
-                                TextSpan(text: "\$$rate / hour", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                                TextSpan(
+                                  text: isTrial ? "🎁 FREE (Trial)" : "\$${rate.toStringAsFixed(2)}/hr",
+                                    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)
+                                ),
                               ],
                             ),
                           ),
