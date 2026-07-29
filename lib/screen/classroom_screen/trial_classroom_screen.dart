@@ -408,6 +408,30 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xff0f766e),
         automaticallyImplyLeading: false,
+        leading: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+          onSelected: (value) {
+            if (value == 'student_control') {
+              // Student control logic here
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem<String>(
+              value: 'student_control',
+              child: Row(
+                children: [
+                  Icon(Icons.control_camera, color: Color(0xff0f766e), size: 22),
+                  SizedBox(width: 10),
+                  TextWidget(
+                    text: "Enable Student Control",
+                    textWeight: FontWeight.bold,
+                    textColor: Color(0xff0f766e),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -455,7 +479,6 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
       )
           : Column(
         children: [
-          // 1. Navigation Bar (Allows navigating inside classroom without killing stream)
           Container(
             color: const Color(0xff111827),
             child: Row(
@@ -481,7 +504,6 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
             ),
           ),
 
-          // 2. Active Tab View (Maintains Agora State seamlessly)
           Expanded(
             child: Stack(
               children: [
@@ -495,7 +517,6 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
                   ],
                 ),
 
-                // Floating PIP Indicator when navigating away from Video tab
                 if (_activeTabIndex != 0 && _isScreenSharing)
                   Positioned(
                     top: 12,
