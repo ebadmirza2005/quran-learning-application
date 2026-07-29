@@ -132,7 +132,7 @@ class _StudentChatScreenState extends State<StudentChatScreen> {
       final String? fcmToken = response?['fcm_token'];
 
       if (fcmToken != null && fcmToken.isNotEmpty) {
-        await _supabase.functions.invoke('send-push-notification', body: {
+        await _supabase.functions.invoke('save-user-fcm-token', body: {
           'to': fcmToken,
           'title': "New message from ${widget.receiverName}",
           'body': messageText,
