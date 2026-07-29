@@ -178,10 +178,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 backgroundColor: const Color(0xff0f766e),
               ),
               onPressed: () async {
-                // 1. Dialog ko pehle close karein safely
                 Navigator.of(dialogContext).pop();
 
-                // 2. Database mein call status update karein
                 try {
                   await Supabase.instance.client
                       .from('calls')
@@ -191,7 +189,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   debugPrint("Error updating call status: $e");
                 }
 
-                // 3. Main context use karke Call Screen par Navigate karein
                 if (context.mounted) {
                   Navigator.push(
                     context,

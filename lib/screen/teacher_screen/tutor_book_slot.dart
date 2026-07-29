@@ -23,9 +23,9 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
   final supabase = Supabase.instance.client;
 
   String? selectedSlotId;
-  Map<String, dynamic>? selectedSlotData; // 👈 Store selected slot object
+  Map<String, dynamic>? selectedSlotData;
   bool isBooking = false;
-  bool isFirstTimeTrial = true;
+  bool isFirstTimeTrial = false; // Initialized false to prevent UI flash
   bool isLoadingTutorData = true;
 
   final List<String> _weekDays = [
@@ -39,7 +39,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
   ];
 
   late String selectedDay;
-  String selectedDuration = "30 Minutes (Free Trial)";
+  String selectedDuration = "1 Hour";
   List<String> _tutorSkills = [];
   Map<String, bool> selectedSkills = {};
   double _hourlyRate = 0.00;
@@ -55,7 +55,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     _fetchTutorDetailsAndTrialStatus();
   }
 
-  // 🕒 Helper Function: Free Trial ke liye start time se 30 minutes add karne ke liye
   String _calculateTrialEndTime(String startTimeStr) {
     try {
       String cleanTime = startTimeStr.trim().toUpperCase();
@@ -67,15 +66,14 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
         parsedTime = DateFormat("HH:mm").parse(cleanTime);
       }
 
-      // 30 Minutes Add karein
       DateTime endTime = parsedTime.add(const Duration(minutes: 30));
       return DateFormat("h:mm a").format(endTime);
     } catch (e) {
-      return startTimeStr; // Fallback agar parsing error ho
+      return startTimeStr;
     }
   }
 
-  // 🔄 Fetch Tutor Details & Trial Eligibility
+  // 🔄 Standard UX Flow: Global Trial Check with Active Statuses Only
   Future<void> _fetchTutorDetailsAndTrialStatus() async {
     try {
       final user = supabase.auth.currentUser;
@@ -114,19 +112,32 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
         });
       }
 
-      // Check Free Trial Eligibility
+      // 🟢 GLOBAL UX CHECK: Filter only active trial requests (Ignore cancelled or rejected)
       if (user != null) {
-        final previousInvites = await supabase
+        final activeTrialBooking = await supabase
+            .from('bookings')
+            .select('id')
+            .eq('student_id', user.id)
+            .eq('is_trial', true)
+            .neq('status', 'cancelled')
+            .neq('status', 'rejected')
+            .limit(1);
+
+        final activeTrialInvite = await supabase
             .from('invites')
             .select('id')
             .eq('student_id', user.id)
-            .eq('tutor_id', widget.tutorId)
-            .limit(1)
-            .maybeSingle();
+            .eq('is_trial', true)
+            .neq('status', 'cancelled')
+            .neq('status', 'rejected')
+            .limit(1);
+
+        bool hasActiveTrialAnywhere = activeTrialBooking.isNotEmpty || activeTrialInvite.isNotEmpty;
 
         if (mounted) {
           setState(() {
-            isFirstTimeTrial = (previousInvites == null) && !widget.isAlreadyHired;
+            // Student gets trial ONLY if no active/completed trial exists AND not already hired
+            isFirstTimeTrial = (!hasActiveTrialAnywhere) && (!widget.isAlreadyHired);
 
             if (isFirstTimeTrial) {
               selectedDuration = "30 Minutes (Free Trial)";
@@ -134,6 +145,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
               selectedDuration = "1 Hour";
             }
           });
+          debugPrint("🔥 STANDARD UX -> IS TRIAL ELIGIBLE: $isFirstTimeTrial");
         }
       }
     } catch (e) {
@@ -145,7 +157,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     }
   }
 
-  // 🟢 DIRECT SLOT BOOKING (Already Hired Context)
   Future<void> _bookDirectSlot() async {
     if (selectedSlotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -193,7 +204,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     }
   }
 
-  // 🟢 SUBMIT FREE TRIAL / INVITATION
   Future<void> _submitBookingAndInvite() async {
     final currentStudentId = supabase.auth.currentUser?.id;
     if (currentStudentId == null) return;
@@ -213,24 +223,28 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     setState(() => isBooking = true);
 
     try {
+      final bool trialStatusToSave = (isFirstTimeTrial == true);
+      final actualRate = trialStatusToSave ? 0.0 : _hourlyRate;
+      final finalDuration = trialStatusToSave ? "30 Minutes (Free Trial)" : selectedDuration;
+
+      debugPrint("🚀 Standard Flow Insert -> is_trial: $trialStatusToSave | rate: $actualRate");
+
       final bookingRes = await supabase.from('bookings').insert({
         'student_id': currentStudentId,
         'tutor_id': widget.tutorId,
         'slot_id': selectedSlotId,
         'status': 'pending',
-        'is_trial': isFirstTimeTrial,
+        'is_trial': trialStatusToSave,
         'created_at': DateTime.now().toIso8601String(),
       }).select().single();
-
-      final actualRate = isFirstTimeTrial ? 0.0 : _hourlyRate;
 
       await supabase.from('invites').insert({
         'tutor_id': widget.tutorId,
         'student_id': currentStudentId,
-        'duration': selectedDuration,
+        'duration': finalDuration,
         'selected_skills': chosenSkills,
         'hourly_rate': actualRate,
-        'is_trial': isFirstTimeTrial,
+        'is_trial': trialStatusToSave,
         'status': 'pending',
         'booking_id': bookingRes['id'],
       });
@@ -243,7 +257,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isFirstTimeTrial
+            trialStatusToSave
                 ? "🎁 Free Trial Claimed & Request Sent!"
                 : "Slot Booked and Invitation Sent!",
           ),
@@ -279,7 +293,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     String slotStartTime = selectedSlotData!['start_time'] ?? 'N/A';
     String fullSlotEndTime = selectedSlotData!['end_time'] ?? 'N/A';
 
-    // ⚡ Agar Free Trial hai to 30 min add honge, nahi to regular end time rahega
     String displayEndTime = isFirstTimeTrial
         ? _calculateTrialEndTime(slotStartTime)
         : fullSlotEndTime;
@@ -364,7 +377,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                         children: [
                           TextWidget(text: "Slot Time: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
                           const SizedBox(width: 3),
-                          // 👈 Updated: Displays 30 min end time for trial, full time otherwise
                           TextWidget(text: "$slotStartTime - $displayEndTime"),
                         ],
                       ),
@@ -541,7 +553,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
       ),
       body: Column(
         children: [
-          // 🎁 FREE TRIAL PROMO BANNER AT TOP
           if (!isLoadingTutorData && isFirstTimeTrial && !widget.isAlreadyHired)
             Container(
               width: double.infinity,
@@ -602,7 +613,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                           setState(() {
                             selectedDay = day;
                             selectedSlotId = null;
-                            selectedSlotData = null; // Reset selection
+                            selectedSlotData = null;
                           });
                         }
                       },
@@ -667,7 +678,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                             ? null
                             : () => setState(() {
                           selectedSlotId = slotId;
-                          selectedSlotData = item; // 👈 Save selected slot object
+                          selectedSlotData = item;
                         }),
                         leading: CircleAvatar(
                           backgroundColor: isPassed
