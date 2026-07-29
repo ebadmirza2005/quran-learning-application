@@ -170,7 +170,6 @@ class _TutorListScreenState extends State<TutorListScreen> {
 
                                       ],
                                     ),
-
                                     SizedBox(height: 10,),
                                     Container(
                                       color: const Color(0xff0f766e),
