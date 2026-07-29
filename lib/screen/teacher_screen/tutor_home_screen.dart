@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/notification_service.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
 import '../classroom_screen/trial_classroom_screen.dart';
@@ -35,6 +36,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     tabController = TabController(length: 2, vsync: this);
     _fetchTutorData();
     _listenForIncomingCalls();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService.setupFCMToken(context: context, isTutor: true);
+    });
   }
 
   void _listenForIncomingCalls() {
