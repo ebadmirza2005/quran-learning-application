@@ -6,6 +6,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../utils/text.dart';
+import '../teacher_screen/classroom_demo/qaida_index_tab.dart';
+import '../teacher_screen/classroom_demo/quran_index_tab.dart';
+import '../teacher_screen/classroom_demo/whiteboard_tab.dart';
 
 class TrialClassroomScreen extends StatefulWidget {
   final String channelId;
@@ -386,62 +389,16 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
     );
   }
 
-  Widget _buildClassNotesView() {
-    return Container(
-      color: Colors.grey[900],
-      padding: const EdgeInsets.all(16.0),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Classroom Notes",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 12),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Text(
-                "Yahan aap notes, interactive board widgets, ya real-time text chat include kar sakte hain. Screen sharing background me live rahegi.",
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  Widget _buildClassQuranView() {
+    return QuranIndexTab();
   }
 
-  Widget _buildClassMaterialsView() {
-    return Container(
-      color: Colors.grey[900],
-      padding: const EdgeInsets.all(16.0),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Study Materials & PDFs",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 12),
-          Expanded(
-            child: Center(
-              child: Text(
-                "Yahan PDFs, Whiteboard, ya Quiz UI load karein.",
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  Widget _buildClassQaidaView() {
+    return QaidaIndexTab();
+  }
+
+  Widget _buildClassWhiteboardView() {
+    return WhiteboardTab();
   }
 
   @override
@@ -506,18 +463,19 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
               children: [
                 _buildNavButton(
                   index: 0,
-                  icon: Icons.video_call,
                   label: "Video",
                 ),
                 _buildNavButton(
                   index: 1,
-                  icon: Icons.note_alt,
-                  label: "Notes",
+                  label: "Quran",
                 ),
                 _buildNavButton(
                   index: 2,
-                  icon: Icons.folder,
-                  label: "Materials",
+                  label: "Qaida",
+                ),
+                _buildNavButton(
+                  index: 3,
+                  label: "Whiteboard",
                 ),
               ],
             ),
@@ -531,8 +489,9 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
                   index: _activeTabIndex,
                   children: [
                     _buildVideoCallView(),
-                    _buildClassNotesView(),
-                    _buildClassMaterialsView(),
+                    _buildClassQuranView(),
+                    _buildClassQaidaView(),
+                    _buildClassWhiteboardView(),
                   ],
                 ),
 
@@ -573,7 +532,6 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
             ),
           ),
 
-          // 3. Persistent Call Controls at Bottom
           Container(
             padding:
             const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -628,7 +586,6 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
 
   Widget _buildNavButton({
     required int index,
-    required IconData icon,
     required String label,
   }) {
     final bool isSelected = _activeTabIndex == index;
@@ -641,7 +598,6 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
           _activeTabIndex = index;
         });
       },
-      icon: Icon(icon, size: 20),
       label: Text(
         label,
         style: TextStyle(
