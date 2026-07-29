@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "563119912380",
+    "project_id": "faaz-al-quran",
+    "storage_bucket": "faaz-al-quran.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:563119912380:android:958b7bee7c6b37302fe7b9",
+        "android_client_info": {
+          "package_name": "com.example.dreams_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACBD9Unq4wBH0G9xlXYfJMhWSbMaXSd3s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
