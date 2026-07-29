@@ -34,6 +34,9 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
   bool _isScreenSharing = false;
   bool _isLoading = true;
 
+  // Navigation Tab Control (0 = Video Call, 1 = Class Notes, 2 = Materials)
+  int _activeTabIndex = 0;
+
   static const int _totalTrialSeconds = 1800;
   int _remainingSeconds = _totalTrialSeconds;
   Timer? _timer;
@@ -231,7 +234,6 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
   Future<void> _toggleScreenShare() async {
     try {
       if (!_isScreenSharing) {
-        // 1. Start Screen Capture
         await _engine.startScreenCapture(
           const ScreenCaptureParameters2(
             captureAudio: true,
@@ -249,7 +251,6 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
           ),
         );
 
-        // 2. Publish Screen Track and Unpublish Camera Track
         await _engine.updateChannelMediaOptions(
           const ChannelMediaOptions(
             publishScreenTrack: true,
@@ -263,10 +264,8 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
           _isScreenSharing = true;
         });
       } else {
-        // 3. Stop Screen Capture
         await _engine.stopScreenCapture();
 
-        // 4. Unpublish Screen Track and Restore Camera Track State
         await _engine.updateChannelMediaOptions(
           ChannelMediaOptions(
             publishScreenTrack: false,
@@ -301,6 +300,148 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
     _engine.leaveChannel();
     _engine.release();
     super.dispose();
+  }
+
+  // --- TAB CONTENT BUILDERS ---
+
+  Widget _buildVideoCallView() {
+    return Stack(
+      children: [
+        // 1. Remote View
+        Center(
+          child: _remoteUid != null
+              ? AgoraVideoView(
+            controller: VideoViewController.remote(
+              rtcEngine: _engine,
+              canvas: VideoCanvas(
+                uid: _remoteUid,
+                renderMode: RenderModeType.renderModeFit,
+              ),
+              connection: RtcConnection(channelId: widget.channelId),
+            ),
+          )
+              : Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                color: Color(0xff0f766e),
+              ),
+              const SizedBox(height: 16),
+              TextWidget(
+                text: "Waiting for ${widget.tutorName} to join...",
+                textColor: Colors.white,
+              )
+            ],
+          ),
+        ),
+
+        // 2. PIP Local View
+        Positioned(
+          top: 20,
+          right: 20,
+          width: 110,
+          height: 150,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.grey[900],
+              child: _isScreenSharing
+                  ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.screen_share,
+                        color: Colors.amber, size: 30),
+                    SizedBox(height: 6),
+                    Text(
+                      "Sharing\nScreen",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : (_localUserJoined && !_isVideoOff
+                  ? AgoraVideoView(
+                controller: VideoViewController(
+                  rtcEngine: _engine,
+                  canvas: const VideoCanvas(uid: 0),
+                ),
+              )
+                  : const Center(
+                child: Icon(
+                  Icons.person_off,
+                  color: Colors.white54,
+                  size: 30,
+                ),
+              )),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClassNotesView() {
+    return Container(
+      color: Colors.grey[900],
+      padding: const EdgeInsets.all(16.0),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Classroom Notes",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Text(
+                "Yahan aap notes, interactive board widgets, ya real-time text chat include kar sakte hain. Screen sharing background me live rahegi.",
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClassMaterialsView() {
+    return Container(
+      color: Colors.grey[900],
+      padding: const EdgeInsets.all(16.0),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Study Materials & PDFs",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 12),
+          Expanded(
+            child: Center(
+              child: Text(
+                "Yahan PDFs, Whiteboard, ya Quiz UI load karein.",
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -355,141 +496,157 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
           ? const Center(
         child: CircularProgressIndicator(color: Color(0xff0f766e)),
       )
-          : Stack(
+          : Column(
         children: [
-          // 1. Remote View (Handles Both Video & Screen Share Automatically)
-          Center(
-            child: _remoteUid != null
-                ? AgoraVideoView(
-              controller: VideoViewController.remote(
-                rtcEngine: _engine,
-                canvas: VideoCanvas(
-                  uid: _remoteUid,
-                  renderMode: RenderModeType.renderModeFit,
-                ),
-                connection: RtcConnection(channelId: widget.channelId),
-              ),
-            )
-                : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+          // 1. Navigation Bar (Allows navigating inside classroom without killing stream)
+          Container(
+            color: const Color(0xff111827),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                const CircularProgressIndicator(
-                  color: Color(0xff0f766e),
+                _buildNavButton(
+                  index: 0,
+                  icon: Icons.video_call,
+                  label: "Video",
                 ),
-                const SizedBox(height: 16),
-                TextWidget(
-                  text: "Waiting for ${widget.tutorName} to join...",
-                  textColor: Colors.white,
-                )
+                _buildNavButton(
+                  index: 1,
+                  icon: Icons.note_alt,
+                  label: "Notes",
+                ),
+                _buildNavButton(
+                  index: 2,
+                  icon: Icons.folder,
+                  label: "Materials",
+                ),
               ],
             ),
           ),
 
-          // 2. PIP Local View
-          Positioned(
-            top: 20,
-            right: 20,
-            width: 110,
-            height: 150,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                color: Colors.grey[900],
-                child: _isScreenSharing
-                    ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.screen_share,
-                          color: Colors.amber, size: 30),
-                      SizedBox(height: 6),
-                      Text(
-                        "Sharing\nScreen",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+          // 2. Active Tab View (Maintains Agora State seamlessly)
+          Expanded(
+            child: Stack(
+              children: [
+                IndexedStack(
+                  index: _activeTabIndex,
+                  children: [
+                    _buildVideoCallView(),
+                    _buildClassNotesView(),
+                    _buildClassMaterialsView(),
+                  ],
+                ),
+
+                // Floating PIP Indicator when navigating away from Video tab
+                if (_activeTabIndex != 0 && _isScreenSharing)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _activeTabIndex = 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade800,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.screen_share,
+                                color: Colors.white, size: 16),
+                            SizedBox(width: 6),
+                            Text(
+                              "Sharing Active (Tap to view)",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                )
-                    : (_localUserJoined && !_isVideoOff
-                    ? AgoraVideoView(
-                  controller: VideoViewController(
-                    rtcEngine: _engine,
-                    canvas: const VideoCanvas(uid: 0),
-                  ),
-                )
-                    : const Center(
-                  child: Icon(
-                    Icons.person_off,
-                    color: Colors.white54,
-                    size: 30,
-                  ),
-                )),
-              ),
+              ],
             ),
           ),
 
-          // 3. Bottom Controls
-          Positioned(
-            bottom: 30,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                  vertical: 12, horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _isMuted ? Icons.mic_off : Icons.mic,
-                      color: _isMuted ? Colors.redAccent : Colors.white,
-                    ),
-                    onPressed: _toggleMute,
+          // 3. Persistent Call Controls at Bottom
+          Container(
+            padding:
+            const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            color: Colors.black,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    _isMuted ? Icons.mic_off : Icons.mic,
+                    color: _isMuted ? Colors.redAccent : Colors.white,
                   ),
-                  IconButton(
-                    icon: Icon(
-                      _isVideoOff ? Icons.videocam_off : Icons.videocam,
-                      color:
-                      _isVideoOff ? Colors.redAccent : Colors.white,
-                    ),
-                    onPressed: _toggleVideo,
+                  onPressed: _toggleMute,
+                ),
+                IconButton(
+                  icon: Icon(
+                    _isVideoOff ? Icons.videocam_off : Icons.videocam,
+                    color:
+                    _isVideoOff ? Colors.redAccent : Colors.white,
                   ),
-                  IconButton(
-                    icon: Icon(
-                      _isScreenSharing
-                          ? Icons.stop_screen_share
-                          : Icons.screen_share,
-                      color:
-                      _isScreenSharing ? Colors.amber : Colors.white,
-                    ),
-                    onPressed: _toggleScreenShare,
+                  onPressed: _toggleVideo,
+                ),
+                IconButton(
+                  icon: Icon(
+                    _isScreenSharing
+                        ? Icons.stop_screen_share
+                        : Icons.screen_share,
+                    color:
+                    _isScreenSharing ? Colors.amber : Colors.white,
                   ),
-                  CircleAvatar(
-                    backgroundColor: Colors.red,
-                    radius: 24,
-                    child: IconButton(
-                      icon:
-                      const Icon(Icons.call_end, color: Colors.white),
-                      onPressed: () async {
-                        await _leaveChannel();
-                        if (context.mounted) Navigator.pop(context);
-                      },
-                    ),
+                  onPressed: _toggleScreenShare,
+                ),
+                CircleAvatar(
+                  backgroundColor: Colors.red,
+                  radius: 22,
+                  child: IconButton(
+                    icon:
+                    const Icon(Icons.call_end, color: Colors.white),
+                    onPressed: () async {
+                      await _leaveChannel();
+                      if (context.mounted) Navigator.pop(context);
+                    },
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNavButton({
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final bool isSelected = _activeTabIndex == index;
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        foregroundColor: isSelected ? const Color(0xff0f766e) : Colors.white60,
+      ),
+      onPressed: () {
+        setState(() {
+          _activeTabIndex = index;
+        });
+      },
+      icon: Icon(icon, size: 20),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
     );
   }
