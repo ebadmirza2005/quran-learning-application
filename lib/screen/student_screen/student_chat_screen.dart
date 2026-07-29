@@ -104,9 +104,49 @@ class _StudentChatScreenState extends State<StudentChatScreen> {
         'created_at': DateTime.now().toUtc().toIso8601String(),
         'is_read': false,
       });
+
+      _sendPushNotificationToReceiver(text);
+
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
+  }
+
+  Future<void> _sendPushNotificationToReceiver(String messageText) async {
+    try {
+      var response = await _supabase
+          .from('tutors')
+          .select('fcm_token')
+          .eq('id', widget.receiverId.trim())
+          .maybeSingle();
+
+      if (response == null || response['fcm_token'] == null) {
+        response = await _supabase
+            .from('students')
+            .select('fcm_token')
+            .eq('id', widget.receiverId.trim())
+            .maybeSingle();
+      }
+
+      final String? fcmToken = response?['fcm_token'];
+
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        await _supabase.functions.invoke('send-push-notification', body: {
+          'to': fcmToken,
+          'title': "New message from ${widget.receiverName}", // Sender Name
+          'body': messageText,
+          'data': {
+            'type': 'chat',
+            'sender_id': _currentUserId,
+          }
+        });
+        debugPrint("🚀 Student Chat: Notification dispatched to receiver!");
+      } else {
+        debugPrint("⚠️ Receiver FCM Token is empty or null.");
+      }
+    } catch (e) {
+      debugPrint("❌ Student Chat Notification Error: $e");
     }
   }
 
