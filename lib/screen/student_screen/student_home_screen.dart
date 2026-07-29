@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
+import '../classroom_screen/trial_classroom_screen.dart';
 import 'student_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -110,15 +111,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 }
 
                 if (context.mounted) {
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => TutorCallScreen(
+                      builder: (_) => TrialClassroomScreen(
                         channelId: channelId,
-                        receiverName: callerName,
+                        tutorName: callerName,
+                        isTutor: false,
                       ),
                     ),
                   );
+
+                  // Navigator.push(
+                  //   context,
+                  //   MaterialPageRoute(
+                  //     builder: (_) => TutorCallScreen(
+                  //       channelId: channelId,
+                  //       receiverName: callerName,
+                  //     ),
+                  //   ),
+                  // );
                 }
               },
               child: const Text("Accept", style: TextStyle(color: Colors.white)),
@@ -663,13 +676,24 @@ class _MyTutorsTabState extends State<MyTutorsTab> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => TutorCallScreen(
+                      builder: (_) => TrialClassroomScreen(
                         channelId: channelId,
-                        receiverName: tutorName,
-                        receiverImage: tutorImage?.toString(),
+                        tutorName: tutorName,
+                        isTutor: false,
                       ),
                     ),
                   );
+
+                  // Navigator.push(
+                  //   context,
+                  //   MaterialPageRoute(
+                  //     builder: (_) => TutorCallScreen(
+                  //       channelId: channelId,
+                  //       receiverName: tutorName,
+                  //       receiverImage: tutorImage?.toString(),
+                  //     ),
+                  //   ),
+                  // );
                 } catch (e) {
                   debugPrint("Student Call Error: $e");
 

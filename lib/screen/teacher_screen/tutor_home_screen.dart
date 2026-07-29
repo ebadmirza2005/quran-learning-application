@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/text.dart';
+import '../classroom_screen/trial_classroom_screen.dart';
 import 'tutor_call_screen.dart';
 import 'tutor_chat_screen.dart';
 import 'tutor_edit_info.dart';
@@ -195,9 +196,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => TutorCallScreen(
+                      builder: (_) => TrialClassroomScreen(
                         channelId: channelId,
-                        receiverName: callerName,
+                        tutorName: callerName,
+                        isTutor: true,
                       ),
                     ),
                   );
@@ -667,7 +669,7 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
           ),
         );
         setState(() {
-          _loadInvites(); // 👈 Fixed method call
+          _loadInvites();
         });
       }
     } catch (e) {
@@ -1223,13 +1225,24 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => TutorCallScreen(
+                      builder: (context) => TrialClassroomScreen(
                         channelId: channelId,
-                        receiverName: studentName,
-                        receiverImage: studentImageUrl?.toString(),
+                        tutorName: tutorName,
+                        isTutor: true,
                       ),
-                    ),
+                    )
                   );
+
+                  // Navigator.push(
+                  //   context,
+                  //   MaterialPageRoute(
+                  //     builder: (context) => TutorCallScreen(
+                  //       channelId: channelId,
+                  //       receiverName: studentName,
+                  //       receiverImage: studentImageUrl?.toString(),
+                  //     ),
+                  //   ),
+                  // );
                 } catch (e) {
                   debugPrint("CALL ERROR: $e");
 

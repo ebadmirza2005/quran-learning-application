@@ -20,11 +20,20 @@
     <key>NSCameraUsageDescription</key>
     <string>This app requires access to the camera for video calling and profile photos.</string>
 
-    <!-- Background Modes (Required for iOS Audio Calling) -->
+    <!-- 🟢 ADDED: Local Network Usage (Crucial for Agora WebRTC on iOS 14+) -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>This app requires local network access for peer-to-peer audio and video calling.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_agora._tcp</string>
+    </array>
+
+    <!-- Background Modes (Required for iOS Audio Calling & Media Processing) -->
     <key>UIBackgroundModes</key>
     <array>
         <string>audio</string>
         <string>voip</string>
+
     </array>
 
     <key>NSAppleMusicUsageDescription</key>
