@@ -114,6 +114,9 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
           _localMessages.removeWhere((msg) => msg['id'] == tempId);
         });
       }
+
+      _sendPushNotificationToReceiver(text);
+
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -121,6 +124,35 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
+    }
+  }
+
+  Future<void> _sendPushNotificationToReceiver(String messageText) async {
+    try {
+      var response = await _supabase.from('students').select('fcm_token').eq('id', widget.receiverId.trim()).maybeSingle();
+
+      if (response == null || response['fcm_token'] == null) {
+        response = await _supabase.from('tutors').select('fcm_token').eq('id', widget.receiverId.trim()).maybeSingle();
+      }
+
+      final String? fcmToken = response?['fcm_token'];
+
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        await _supabase.functions.invoke('send-push-notification', body: {
+          'to': fcmToken,
+          'title': "New Message",
+          'body': messageText,
+          'data': {
+            'type': 'chat',
+            'sender_id': _currentUserId
+          }
+        });
+        debugPrint("Push Notification sent successfully to receiver!");
+      }else {
+        debugPrint("Receiver FCM Token not found. Push notification not sent.");
+      }
+    }catch (e) {
+      debugPrint("Error sending push notification: $e");
     }
   }
 

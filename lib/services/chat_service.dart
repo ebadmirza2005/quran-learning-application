@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatService {
@@ -9,7 +9,7 @@ class ChatService {
     required String messageText,
     required String senderName,
     required bool isReceiverTutor,
-}) async {
+  }) async {
     final currentUser = _supabase.auth.currentUser;
     if (currentUser == null) return;
 
@@ -21,25 +21,34 @@ class ChatService {
         'is_read': false,
         'created_at': DateTime.now().toIso8601String(),
       });
+      debugPrint("✅ Message saved in Supabase database.");
 
       final targetTable = isReceiverTutor ? 'tutors' : 'students';
-      final receiverData = await _supabase.from(targetTable).select('fcm_token').eq('id', receiverId).maybeSingle();
+
+      final receiverData = await _supabase
+          .from(targetTable)
+          .select('fcm_token')
+          .eq('id', receiverId)
+          .maybeSingle();
+
       final String? fcmToken = receiverData?['fcm_token'];
 
       if (fcmToken != null && fcmToken.isNotEmpty) {
         await _supabase.functions.invoke('send-push-notification', body: {
           'to': fcmToken,
-          'title': 'New Message from $senderName',
+          'title': "New Message from $senderName",
           'body': messageText,
           'data': {
             'type': 'chat',
             'sender_id': currentUser.id,
           }
         });
-        debugPrint("Push notification sent to $fcmToken");
+        debugPrint("🚀 Push Notification dispatched to FCM Token!");
+      } else {
+        debugPrint("⚠️ Receiver FCM Token not found (User might be offline or logged out).");
       }
-    }catch (e) {
-      debugPrint("Error sending message: $e");
+    } catch (e) {
+      debugPrint("❌ Chat Send Error: $e");
     }
   }
 }
