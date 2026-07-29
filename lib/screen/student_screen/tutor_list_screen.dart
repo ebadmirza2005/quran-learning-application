@@ -110,7 +110,6 @@ class _TutorListScreenState extends State<TutorListScreen> {
                     String skillsDisplay = makeDataSafe(tutor['skills']);
                     String rates = makeDataSafe(tutor['rates']);
 
-                    bool isOnline = tutor['is_online'] as bool? ?? false;
                     double averageRating = (tutor['rating'] as num? ?? 0.0).toDouble();
 
                     return Padding(
@@ -182,11 +181,6 @@ class _TutorListScreenState extends State<TutorListScreen> {
                                           _buildDataRow("Languages", languages),
                                           _buildDataRow("Expertise", skillsDisplay),
                                           _buildDataRow("Rates", rates),
-                                          _buildDataRow(
-                                            "Online",
-                                            isOnline ? "Yes" : "No",
-                                            valueColor: isOnline ? Colors.greenAccent : Colors.white60,
-                                          ),
                                         ],
                                       ),
                                     ),

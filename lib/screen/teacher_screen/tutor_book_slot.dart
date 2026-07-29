@@ -74,6 +74,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
   }
 
   // 🔄 Standard UX Flow: Global Trial Check with Active Statuses Only
+  // 🔄 FIXED: Check only if student has ALREADY USED a TRIAL before
   Future<void> _fetchTutorDetailsAndTrialStatus() async {
     try {
       final user = supabase.auth.currentUser;
@@ -112,32 +113,32 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
         });
       }
 
-      // 🟢 GLOBAL UX CHECK: Filter only active trial requests (Ignore cancelled or rejected)
+      // 🟢 FIX: Strictly query only rows where is_trial WAS ALREADY TRUE
       if (user != null) {
-        final activeTrialBooking = await supabase
+        final usedTrialBooking = await supabase
             .from('bookings')
             .select('id')
             .eq('student_id', user.id)
-            .eq('is_trial', true)
+            .eq('is_trial', true) // <-- MUST match trial flag
             .neq('status', 'cancelled')
             .neq('status', 'rejected')
             .limit(1);
 
-        final activeTrialInvite = await supabase
+        final usedTrialInvite = await supabase
             .from('invites')
             .select('id')
             .eq('student_id', user.id)
-            .eq('is_trial', true)
+            .eq('is_trial', true) // <-- MUST match trial flag
             .neq('status', 'cancelled')
             .neq('status', 'rejected')
             .limit(1);
 
-        bool hasActiveTrialAnywhere = activeTrialBooking.isNotEmpty || activeTrialInvite.isNotEmpty;
+        bool hasUsedTrialAlready = usedTrialBooking.isNotEmpty || usedTrialInvite.isNotEmpty;
 
         if (mounted) {
           setState(() {
-            // Student gets trial ONLY if no active/completed trial exists AND not already hired
-            isFirstTimeTrial = (!hasActiveTrialAnywhere) && (!widget.isAlreadyHired);
+            // Student gets trial if they NEVER used a trial before AND not already hired
+            isFirstTimeTrial = (!hasUsedTrialAlready) && (!widget.isAlreadyHired);
 
             if (isFirstTimeTrial) {
               selectedDuration = "30 Minutes (Free Trial)";
@@ -145,7 +146,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
               selectedDuration = "1 Hour";
             }
           });
-          debugPrint("🔥 STANDARD UX -> IS TRIAL ELIGIBLE: $isFirstTimeTrial");
+          debugPrint("🔥 TRIAL ELIGIBLE STATUS: $isFirstTimeTrial");
         }
       }
     } catch (e) {
