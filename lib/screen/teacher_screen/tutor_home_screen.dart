@@ -48,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _callChannel = Supabase.instance.client
         .channel('incoming_calls_${tutorUser.id}')
         .onPostgresChanges(
-      event: PostgresChangeEvent.insert, // Nayi call aane par
+      event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'calls',
       filter: PostgresChangeFilter(
@@ -150,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) { // 👈 Renamed to dialogContext to avoid shadow conflict
+      builder: (dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Row(
@@ -165,7 +165,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             style: const TextStyle(fontSize: 16),
           ),
           actions: [
-            // ❌ DECLINE BUTTON
             TextButton(
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
@@ -637,7 +636,6 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
   }
 
   Future<void> _deleteInvite(dynamic inviteId) async {
-    // 🛑 Confirmation Dialog before Delete
     bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -772,7 +770,7 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
             itemCount: invites.length,
             itemBuilder: (context, index) {
               final invite = invites[index];
-              final inviteId = invite['id']; // 👈 Fixed invite ID reference
+              final inviteId = invite['id'];
 
               final studentProfile = invite['student_profile'] as Map<String, dynamic>?;
 
@@ -793,7 +791,8 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
               final rawRate = invite['hourly_rate'] ?? invite['rate'] ?? invite['price'] ?? 0;
               final double rate = double.tryParse(rawRate.toString()) ?? 0.0;
 
-              final bool isTrial = invite['is_trial'] == true || (rate == 0.0);
+              // 🎯 FIXED: Strictly check DB 'is_trial' flag only
+              final bool isTrial = (invite['is_trial'] == true);
 
               return Stack(
                 clipBehavior: Clip.none,
@@ -848,7 +847,7 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 15), // Close button spacing
+                              const SizedBox(width: 15),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -891,7 +890,9 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
                                 ),
                                 const WidgetSpan(child: SizedBox(width: 6)),
                                 TextSpan(
-                                  text: isTrial ? "🎁 FREE (Trial Lesson)" : "\$${rate.toStringAsFixed(2)} / hour",
+                                  text: isTrial
+                                      ? "🎁 FREE (Trial Lesson)"
+                                      : "\$${rate.toStringAsFixed(2)} / hour",
                                   style: TextStyle(
                                     color: isTrial ? Colors.green.shade700 : Colors.black87,
                                     fontWeight: isTrial ? FontWeight.bold : FontWeight.w600,
@@ -1001,6 +1002,7 @@ class _InvitesTabWidgetState extends State<InvitesTabWidget> {
     );
   }
 }
+
 class StudentsTabWidget extends StatefulWidget {
   const StudentsTabWidget({super.key});
 
@@ -1012,6 +1014,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
   final supabase = Supabase.instance.client;
   late Future<List<Map<String, dynamic>>> _studentsFuture;
   RealtimeChannel? _inviteChannel;
+  RealtimeChannel? _studentChannel;
 
   @override
   void initState() {
@@ -1022,9 +1025,8 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
 
   @override
   void dispose() {
-    if (_inviteChannel != null) {
-      supabase.removeChannel(_inviteChannel!);
-    }
+    if (_inviteChannel != null) supabase.removeChannel(_inviteChannel!);
+    if (_studentChannel != null) supabase.removeChannel(_studentChannel!);
     super.dispose();
   }
 
@@ -1033,7 +1035,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
     if (tutorId == null) return;
 
     _inviteChannel = supabase
-        .channel('my_students_tab_$tutorId')
+        .channel('my_students_invites_$tutorId')
         .onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
@@ -1044,11 +1046,19 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
         value: tutorId,
       ),
       callback: (payload) {
-        if (mounted) {
-          setState(() {
-            _loadStudents();
-          });
-        }
+        if (mounted) setState(() => _loadStudents());
+      },
+    )
+        .subscribe();
+
+    _studentChannel = supabase
+        .channel('my_students_info_changes')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'students',
+      callback: (payload) {
+        if (mounted) setState(() => _loadStudents());
       },
     )
         .subscribe();
@@ -1062,57 +1072,203 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
     final tutorId = supabase.auth.currentUser?.id;
     if (tutorId == null) return [];
 
-    final acceptedInvitesRaw = await supabase
-        .from('invites')
-        .select()
-        .eq('tutor_id', tutorId)
-        .eq('status', 'accepted')
-        .order('created_at', ascending: false);
+    try {
+      final acceptedInvitesRaw = await supabase
+          .from('invites')
+          .select()
+          .eq('tutor_id', tutorId)
+          .eq('status', 'accepted')
+          .order('created_at', ascending: false);
 
-    final List<Map<String, dynamic>> acceptedInvites =
-    List<Map<String, dynamic>>.from(acceptedInvitesRaw);
+      final List<Map<String, dynamic>> acceptedInvites =
+      List<Map<String, dynamic>>.from(acceptedInvitesRaw);
 
-    if (acceptedInvites.isEmpty) return acceptedInvites;
+      if (acceptedInvites.isEmpty) return [];
 
-    final studentIds = acceptedInvites
-        .map((invite) => invite['student_id']?.toString())
-        .whereType<String>()
-        .toSet()
-        .toList();
+      final studentIds = acceptedInvites
+          .map((invite) => invite['student_id']?.toString())
+          .whereType<String>()
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
 
-    if (studentIds.isNotEmpty) {
+      Map<String, Map<String, dynamic>> studentsById = {};
+      if (studentIds.isNotEmpty) {
+        try {
+          final studentsDataRaw = await supabase
+              .from('students')
+              .select()
+              .filter('id', 'in', studentIds);
+
+          final studentsData = List<Map<String, dynamic>>.from(studentsDataRaw);
+          studentsById = {
+            for (final s in studentsData) s['id'].toString(): s,
+          };
+        } catch (e) {
+          debugPrint("Error fetching students table: $e");
+        }
+      }
+
+      // Safe Tutor Availability Query (Handles Multiple Rows Safely)
+      Map<String, dynamic>? tutorAvailability;
       try {
-        final studentsDataRaw = await supabase
-            .from('students')
-            .select()
-            .inFilter('id', studentIds);
+        final availabilityRaw = await supabase
+            .from('tutor_availability')
+            .select('start_time, end_time')
+            .eq('tutor_id', tutorId)
+            .limit(1);
 
-        final studentsData = List<Map<String, dynamic>>.from(studentsDataRaw);
-        final Map<String, Map<String, dynamic>> studentsById = {
-          for (final s in studentsData) s['id'].toString(): s,
-        };
-
-        for (final invite in acceptedInvites) {
-          final sid = invite['student_id']?.toString();
-          if (sid != null && studentsById.containsKey(sid)) {
-            invite['student_info'] = studentsById[sid];
-          }
+        if (availabilityRaw.isNotEmpty) {
+          tutorAvailability = availabilityRaw.first;
         }
       } catch (e) {
-        debugPrint("Could not fetch student profiles: $e");
+        debugPrint("Error fetching tutor_availability: $e");
       }
+
+      final String? fallbackStart = tutorAvailability?['start_time']?.toString();
+      final String? fallbackEnd = tutorAvailability?['end_time']?.toString();
+
+      final List<Map<String, dynamic>> validInvites = [];
+
+      for (final invite in acceptedInvites) {
+        final sid = invite['student_id']?.toString();
+        if (sid != null && studentsById.containsKey(sid)) {
+          invite['student_info'] = studentsById[sid];
+
+          // Priority 1: Invites Table -> Priority 2: Tutor Availability Fallback
+          invite['display_start_time'] = invite['start_time']?.toString() ??
+              invite['time']?.toString() ??
+              invite['class_time']?.toString() ??
+              fallbackStart ??
+              'N/A';
+
+          invite['display_end_time'] = invite['end_time']?.toString() ??
+              invite['to_time']?.toString() ??
+              fallbackEnd ??
+              'N/A';
+
+          validInvites.add(invite);
+        }
+      }
+
+      return validInvites;
+    } catch (e) {
+      debugPrint("General error in _fetchAcceptedInvitesWithStudentInfo: $e");
+      return [];
+    }
+  }
+
+  // --- ACTIONS LOGIC ---
+
+  Future<void> _navigateToCallScreen(Map<String, dynamic> invite, String studentId, String? studentImage) async {
+    if (studentId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid Student ID")),
+      );
+      return;
     }
 
-    return acceptedInvites;
+    try {
+      final tutorUser = supabase.auth.currentUser;
+      if (tutorUser == null) return;
+
+      final inviteId = invite['id']?.toString() ?? 'no_invite';
+      final channelId = "call_${inviteId}_${DateTime.now().millisecondsSinceEpoch}";
+
+      final tutorProfile = await supabase
+          .from('tutors')
+          .select('*')
+          .eq('id', tutorUser.id)
+          .maybeSingle();
+
+      final String tutorName = tutorProfile?['name'] ?? tutorProfile?['full_name'] ?? "Tutor";
+      final String? tutorImage = tutorProfile?['caller_image'] ?? tutorProfile?['profile_image'];
+
+      await supabase.from('calls').insert({
+        'caller_id': tutorUser.id,
+        'caller_name': tutorName,
+        'caller_image': tutorImage,
+        'receiver_id': studentId,
+        'channel_id': channelId,
+        'status': 'calling',
+      });
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TrialClassroomScreen(
+            channelId: channelId,
+            tutorName: tutorName,
+            isTutor: true,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint("CALL ERROR: $e");
+    }
+  }
+
+  Future<void> _endContract(Map<String, dynamic> invite, String studentName) async {
+    final bool? shouldEnd = await showDialog<bool>(
+      barrierDismissible: false,
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Center(
+            child: TextWidget(
+              text: "End Contract",
+              textWeight: FontWeight.bold,
+              textColor: Color(0xff0f766e),
+            ),
+          ),
+          content: Text("Ending this contract will terminate your teaching sessions with $studentName. Proceed?"),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButtonWidget(
+                    buttonText: "No",
+                    textColor: Colors.white,
+                    buttonColor: const Color(0xff0f766e),
+                    onTap: () => Navigator.of(dialogContext).pop(false),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButtonWidget(
+                    buttonText: "Yes",
+                    buttonColor: const Color(0xff0f766e),
+                    textColor: Colors.white,
+                    onTap: () => Navigator.of(dialogContext).pop(true),
+                  ),
+                )
+              ],
+            )
+          ],
+        );
+      },
+    );
+
+    if (shouldEnd != true) return;
+
+    try {
+      final inviteId = invite['id'];
+      if (inviteId != null) {
+        await supabase.from('invites').update({'status': 'ended'}).eq('id', inviteId);
+        if (mounted) setState(() => _loadStudents());
+      }
+    } catch (e) {
+      debugPrint("END CONTRACT ERROR: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final tutorId = supabase.auth.currentUser?.id;
-
-    if (tutorId == null) {
-      return const Center(child: Text("User not logged in."));
-    }
+    if (tutorId == null) return const Center(child: Text("User not logged in."));
 
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _studentsFuture,
@@ -1145,11 +1301,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
 
         return RefreshIndicator(
           onRefresh: () async {
-            if (mounted) {
-              setState(() {
-                _loadStudents();
-              });
-            }
+            if (mounted) setState(() => _loadStudents());
           },
           color: const Color(0xff0f766e),
           child: ListView.builder(
@@ -1158,210 +1310,26 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
             itemBuilder: (context, index) {
               final invite = students[index];
               final studentInfo = invite['student_info'] as Map<String, dynamic>?;
+
               final String studentId = invite['student_id']?.toString() ?? '';
-              final String studentName =
-              (studentInfo?['name'] ?? studentInfo?['full_name'] ?? 'Student').toString();
-              final String? studentImage =
-              (studentInfo?['profile_image'] ?? studentInfo?['avatar_url'])?.toString();
+              final String studentName = studentInfo?['name']?.toString() ??
+                  studentInfo?['full_name']?.toString() ??
+                  studentInfo?['username']?.toString() ??
+                  'Student';
+
+              final String? studentImage = studentInfo?['profile_image']?.toString() ??
+                  studentInfo?['avatar_url']?.toString();
+
               final List<dynamic> skills = invite['selected_skills'] ?? [];
               final String duration = invite['duration']?.toString() ?? 'N/A';
               final rawRate = invite['hourly_rate'] ?? invite['rate'] ?? invite['price'] ?? 0;
               final double parsedRate = double.tryParse(rawRate.toString()) ?? 0.0;
-              final bool isTrial = invite['is_trial'] == true || (parsedRate == 0.0);
 
-              void navigateToCallScreen() async {
-                if (studentId.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Invalid Student ID")),
-                  );
-                  return;
-                }
+              // 🎯 FIXED: Check only DB 'is_trial' flag explicitly
+              final bool isTrial = (invite['is_trial'] == true);
 
-                try {
-                  final tutorUser = supabase.auth.currentUser;
-
-                  if (tutorUser == null) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Tutor not logged in")),
-                    );
-                    return;
-                  }
-
-                  final studentImageUrl = studentImage ??
-                      invite['student_image'] ??
-                      invite['avatar_url'] ??
-                      invite['profile_image'] ??
-                      invite['image'];
-
-                  final inviteId = invite['id']?.toString() ?? 'no_invite';
-                  final channelId = "call_${inviteId}_${DateTime.now().millisecondsSinceEpoch}";
-
-                  final tutorProfile = await supabase
-                      .from('tutors')
-                      .select('*')
-                      .eq('id', tutorUser.id)
-                      .maybeSingle();
-
-                  final String tutorName = tutorProfile?['name'] ??
-                      tutorProfile?['full_name'] ??
-                      "Tutor";
-
-                  final String? tutorImage = tutorProfile?['caller_image'] ??
-                      tutorProfile?['profile_image'] ??
-                      tutorProfile?['image'] ??
-                      tutorProfile?['photo'];
-
-                  await supabase.from('calls').insert({
-                    'caller_id': tutorUser.id,
-                    'caller_name': tutorName,
-                    'caller_image': tutorImage,
-                    'receiver_id': studentId,
-                    'channel_id': channelId,
-                    'status': 'calling',
-                  });
-
-                  if (!context.mounted) return;
-
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TrialClassroomScreen(
-                        channelId: channelId,
-                        tutorName: tutorName,
-                        isTutor: true,
-                      ),
-                    )
-                  );
-
-                  // Navigator.push(
-                  //   context,
-                  //   MaterialPageRoute(
-                  //     builder: (context) => TutorCallScreen(
-                  //       channelId: channelId,
-                  //       receiverName: studentName,
-                  //       receiverImage: studentImageUrl?.toString(),
-                  //     ),
-                  //   ),
-                  // );
-                } catch (e) {
-                  debugPrint("CALL ERROR: $e");
-
-                  if (!context.mounted) return;
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("Call Error: ${e.toString()}"),
-                      backgroundColor: Colors.redAccent,
-                    ),
-                  );
-                }
-              }
-
-              void endContract() async {
-                final bool? shouldEnd = await showDialog<bool>(
-                  barrierDismissible: false,
-                  context: context,
-                  builder: (BuildContext dialogContext) {
-                    return AlertDialog(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      title: const Center(
-                        child: TextWidget(
-                          text: "End Contract",
-                          textWeight: FontWeight.bold,
-                          textColor: Color(0xff0f766e),
-                        ),
-                      ),
-                      content: Text(
-                        "Ending this contract will terminate your teaching sessions with $studentName and remove your classroom access for this student. Do you wish to proceed?",
-                      ),
-                      actions: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButtonWidget(
-                                buttonText: "No",
-                                textColor: Colors.white,
-                                buttonColor: const Color(0xff0f766e),
-                                onTap: () => Navigator.of(dialogContext).pop(false),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButtonWidget(
-                                buttonText: "Yes",
-                                buttonColor: const Color(0xff0f766e),
-                                textColor: Colors.white,
-                                onTap: () {
-                                  Navigator.of(dialogContext).pop(true);
-                                },
-                              ),
-                            )
-                          ],
-                        )
-                      ],
-                    );
-                  },
-                );
-
-                if (shouldEnd != true) return;
-
-                try {
-                  final inviteId = invite['id'];
-
-                  if (inviteId == null) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Invite ID is missing!")),
-                    );
-                    return;
-                  }
-
-                  if (context.mounted) {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => const Center(
-                        child: CircularProgressIndicator(color: Color(0xff0f766e)),
-                      ),
-                    );
-                  }
-
-                  await supabase
-                      .from('invites')
-                      .update({'status': 'ended'})
-                      .eq('id', inviteId);
-
-                  if (!context.mounted) return;
-                  Navigator.pop(context); // Close loading dialog
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Contract ended successfully"),
-                      backgroundColor: Color(0xff0f766e),
-                    ),
-                  );
-
-                  setState(() {
-                    _loadStudents();
-                  });
-
-                } catch (e) {
-                  debugPrint("END CONTRACT ERROR: $e");
-
-                  if (!context.mounted) return;
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("Error ending contract: ${e.toString()}"),
-                      backgroundColor: Colors.redAccent,
-                    ),
-                  );
-                }
-              }
+              final String startTime = invite['display_start_time'] ?? 'N/A';
+              final String endTime = invite['display_end_time'] ?? 'N/A';
 
               return Stack(
                 clipBehavior: Clip.none,
@@ -1416,7 +1384,6 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                   ],
                                 ),
                                 const SizedBox(height: 2),
-
                                 Row(
                                   children: [
                                     const TextWidget(
@@ -1433,8 +1400,42 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const TextWidget(
+                                      text: "Time:  ",
+                                      textWeight: FontWeight.bold,
+                                      textColor: Color(0xff0f766e),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xff0f766e).withOpacity(0.08),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.access_time_rounded, size: 14, color: Color(0xff0f766e)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            (endTime != 'N/A' && endTime.isNotEmpty)
+                                                ? "$startTime TO $endTime"
+                                                : startTime,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              color: Color(0xff0f766e),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
 
+                                const SizedBox(height: 4),
                                 Row(
                                   children: [
                                     const TextWidget(
@@ -1455,16 +1456,9 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                             ),
                           ),
                           PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert,
-                                color: Color(0xff0f766e)),
+                            icon: const Icon(Icons.more_vert, color: Color(0xff0f766e)),
                             onSelected: (value) {
                               if (value == 'message') {
-                                if (studentId.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Student ID is missing!")),
-                                  );
-                                  return;
-                                }
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -1475,9 +1469,9 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                   ),
                                 );
                               } else if (value == 'call') {
-                                navigateToCallScreen();
+                                _navigateToCallScreen(invite, studentId, studentImage);
                               } else if (value == 'end_contract') {
-                                endContract();
+                                _endContract(invite, studentName);
                               }
                             },
                             itemBuilder: (context) => [
@@ -1486,7 +1480,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                 child: Row(
                                   children: [
                                     Icon(Icons.chat, color: Color(0xff0f766e), size: 22),
-                                    SizedBox(width: 10,),
+                                    SizedBox(width: 10),
                                     TextWidget(
                                       text: "Message",
                                       textWeight: FontWeight.bold,
@@ -1500,7 +1494,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                 child: Row(
                                   children: [
                                     Icon(Icons.call, color: Color(0xff0f766e), size: 22),
-                                    SizedBox(width: 10,),
+                                    SizedBox(width: 10),
                                     TextWidget(
                                       text: "Call",
                                       textWeight: FontWeight.bold,
@@ -1514,7 +1508,7 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                                 child: Row(
                                   children: [
                                     Icon(Icons.description, color: Color(0xff0f766e), size: 22),
-                                    SizedBox(width: 10,),
+                                    SizedBox(width: 10),
                                     TextWidget(
                                       text: "End Contract",
                                       textWeight: FontWeight.bold,
@@ -1529,14 +1523,11 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                       ),
                     ),
                   ),
-
                   Positioned(
                     top: -2,
                     right: -2,
                     child: GestureDetector(
-                      onTap: () async {
-
-                      },
+                      onTap: () => _endContract(invite, studentName),
                       child: Container(
                         width: 26,
                         height: 26,
@@ -1555,7 +1546,6 @@ class _StudentsTabWidgetState extends State<StudentsTabWidget> {
                         child: const Icon(
                           Icons.close_rounded,
                           size: 16,
-                          fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),

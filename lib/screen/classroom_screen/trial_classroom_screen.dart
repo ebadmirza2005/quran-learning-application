@@ -242,14 +242,14 @@ class _TrialClassroomScreenState extends State<TrialClassroomScreen> {
             captureAudio: true,
             audioParams: ScreenAudioParameters(
               sampleRate: 16000,
-              channels: 2,
+              channels: 1,
               captureSignalVolume: 100,
             ),
             captureVideo: true,
             videoParams: ScreenVideoParameters(
               dimensions: VideoDimensions(width: 1280, height: 720),
               frameRate: 15,
-              bitrate: 0,
+              bitrate: 800,
             ),
           ),
         );

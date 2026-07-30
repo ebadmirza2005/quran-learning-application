@@ -25,8 +25,10 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
   String? selectedSlotId;
   Map<String, dynamic>? selectedSlotData;
   bool isBooking = false;
-  bool isFirstTimeTrial = false; // Initialized false to prevent UI flash
+  bool isFirstTimeTrial = false;
   bool isLoadingTutorData = true;
+
+  late Future<List<Map<String, dynamic>>> _slotsFuture;
 
   final List<String> _weekDays = [
     "Monday",
@@ -52,10 +54,13 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     if (!_weekDays.contains(selectedDay)) {
       selectedDay = "Monday";
     }
+
+    _slotsFuture = _fetchTutorSlots();
     _fetchTutorDetailsAndTrialStatus();
   }
 
-  String _calculateTrialEndTime(String startTimeStr) {
+  // Dynamic End Time Calculator based on selected duration
+  String _calculateEndTime(String startTimeStr, String durationStr) {
     try {
       String cleanTime = startTimeStr.trim().toUpperCase();
       DateTime parsedTime;
@@ -66,15 +71,24 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
         parsedTime = DateFormat("HH:mm").parse(cleanTime);
       }
 
-      DateTime endTime = parsedTime.add(const Duration(minutes: 30));
+      int durationInMinutes = 60; // Default 1 hour
+      if (durationStr.contains("30")) {
+        durationInMinutes = 30;
+      } else if (durationStr.contains("1.5")) {
+        durationInMinutes = 90;
+      } else if (durationStr.contains("2")) {
+        durationInMinutes = 120;
+      } else if (durationStr.contains("1")) {
+        durationInMinutes = 60;
+      }
+
+      DateTime endTime = parsedTime.add(Duration(minutes: durationInMinutes));
       return DateFormat("h:mm a").format(endTime);
     } catch (e) {
       return startTimeStr;
     }
   }
 
-  // 🔄 Standard UX Flow: Global Trial Check with Active Statuses Only
-  // 🔄 FIXED: Check only if student has ALREADY USED a TRIAL before
   Future<void> _fetchTutorDetailsAndTrialStatus() async {
     try {
       final user = supabase.auth.currentUser;
@@ -113,13 +127,12 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
         });
       }
 
-      // 🟢 FIX: Strictly query only rows where is_trial WAS ALREADY TRUE
       if (user != null) {
         final usedTrialBooking = await supabase
             .from('bookings')
             .select('id')
             .eq('student_id', user.id)
-            .eq('is_trial', true) // <-- MUST match trial flag
+            .eq('is_trial', true)
             .neq('status', 'cancelled')
             .neq('status', 'rejected')
             .limit(1);
@@ -128,7 +141,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
             .from('invites')
             .select('id')
             .eq('student_id', user.id)
-            .eq('is_trial', true) // <-- MUST match trial flag
+            .eq('is_trial', true)
             .neq('status', 'cancelled')
             .neq('status', 'rejected')
             .limit(1);
@@ -137,7 +150,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
 
         if (mounted) {
           setState(() {
-            // Student gets trial if they NEVER used a trial before AND not already hired
             isFirstTimeTrial = (!hasUsedTrialAlready) && (!widget.isAlreadyHired);
 
             if (isFirstTimeTrial) {
@@ -155,53 +167,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
       if (mounted) {
         setState(() => isLoadingTutorData = false);
       }
-    }
-  }
-
-  Future<void> _bookDirectSlot() async {
-    if (selectedSlotId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please select an available slot first"),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    setState(() => isBooking = true);
-
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-
-      await supabase.from('bookings').insert({
-        'student_id': user.id,
-        'tutor_id': widget.tutorId,
-        'slot_id': selectedSlotId,
-        'status': 'confirmed',
-        'is_trial': false,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Additional slot booked successfully!"),
-          backgroundColor: Color(0xff0f766e),
-        ),
-      );
-
-      Navigator.pop(context, true);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Booking failed: $e"), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => isBooking = false);
     }
   }
 
@@ -228,13 +193,14 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
       final actualRate = trialStatusToSave ? 0.0 : _hourlyRate;
       final finalDuration = trialStatusToSave ? "30 Minutes (Free Trial)" : selectedDuration;
 
-      debugPrint("🚀 Standard Flow Insert -> is_trial: $trialStatusToSave | rate: $actualRate");
+      final String initialStatus = widget.isAlreadyHired ? 'confirmed' : 'pending';
+      final String inviteStatus = widget.isAlreadyHired ? 'accepted' : 'pending';
 
       final bookingRes = await supabase.from('bookings').insert({
         'student_id': currentStudentId,
         'tutor_id': widget.tutorId,
         'slot_id': selectedSlotId,
-        'status': 'pending',
+        'status': initialStatus,
         'is_trial': trialStatusToSave,
         'created_at': DateTime.now().toIso8601String(),
       }).select().single();
@@ -246,21 +212,25 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
         'selected_skills': chosenSkills,
         'hourly_rate': actualRate,
         'is_trial': trialStatusToSave,
-        'status': 'pending',
+        'status': inviteStatus,
         'booking_id': bookingRes['id'],
       });
 
       if (!mounted) return;
 
-      Navigator.of(context).pop();
-      Navigator.of(context).pop(true);
+      Navigator.of(context, rootNavigator: true).pop(); // Close Dialog
+      if (mounted) {
+        Navigator.of(context).pop(true); // Close Screen
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            trialStatusToSave
+            widget.isAlreadyHired
+                ? "Additional Slot Booked Successfully!"
+                : (trialStatusToSave
                 ? "🎁 Free Trial Claimed & Request Sent!"
-                : "Slot Booked and Invitation Sent!",
+                : "Slot Booked and Invitation Sent!"),
           ),
           backgroundColor: const Color(0xff0f766e),
         ),
@@ -292,11 +262,6 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
     }
 
     String slotStartTime = selectedSlotData!['start_time'] ?? 'N/A';
-    String fullSlotEndTime = selectedSlotData!['end_time'] ?? 'N/A';
-
-    String displayEndTime = isFirstTimeTrial
-        ? _calculateTrialEndTime(slotStartTime)
-        : fullSlotEndTime;
 
     showDialog(
       context: context,
@@ -304,6 +269,10 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            String displayEndTime = isFirstTimeTrial
+                ? _calculateEndTime(slotStartTime, "30 Minutes")
+                : _calculateEndTime(slotStartTime, selectedDuration);
+
             Widget buildSkillItem(String skillName) {
               return Row(
                 mainAxisSize: MainAxisSize.min,
@@ -368,7 +337,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          TextWidget(text: "Day: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
+                          const TextWidget(text: "Day: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e)),
                           const SizedBox(width: 3),
                           TextWidget(text: selectedDay),
                         ],
@@ -376,16 +345,16 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          TextWidget(text: "Slot Time: ", textWeight: FontWeight.bold, textColor: const Color(0xff0f766e)),
+                          const TextWidget(text: "Slot Time: ", textWeight: FontWeight.bold, textColor: Color(0xff0f766e)),
                           const SizedBox(width: 3),
                           TextWidget(text: "$slotStartTime - $displayEndTime"),
                         ],
                       ),
                       const SizedBox(height: 15),
-                      TextWidget(
+                      const TextWidget(
                         text: "Lesson Duration",
                         textWeight: FontWeight.bold,
-                        textColor: const Color(0xff0f766e),
+                        textColor: Color(0xff0f766e),
                       ),
                       const SizedBox(height: 8),
 
@@ -417,19 +386,21 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                         selectedValue: selectedDuration,
                         items: const ["30 Minutes", "1 Hour", "1.5 Hours", "2 Hours"],
                         onChanged: (newValue) {
-                          setDialogState(() {
-                            selectedDuration = newValue!;
-                          });
+                          if (newValue != null) {
+                            setDialogState(() {
+                              selectedDuration = newValue;
+                            });
+                          }
                         },
                       ),
 
                       const SizedBox(height: 15),
 
                       if (_tutorSkills.isNotEmpty) ...[
-                        TextWidget(
+                        const TextWidget(
                           text: "What would you like to learn?",
                           textWeight: FontWeight.bold,
-                          textColor: const Color(0xff0f766e),
+                          textColor: Color(0xff0f766e),
                         ),
                         const SizedBox(height: 5),
                         for (int i = 0; i < _tutorSkills.length; i += 2) ...[
@@ -448,10 +419,10 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                         const SizedBox(height: 10),
                         Row(
                           children: [
-                            TextWidget(
+                            const TextWidget(
                               text: "Total Amount: ",
                               textWeight: FontWeight.bold,
-                              textColor: const Color(0xff0f766e),
+                              textColor: Color(0xff0f766e),
                             ),
                             const SizedBox(width: 3),
                             TextWidget(
@@ -474,7 +445,9 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                           ),
                           Expanded(
                             child: ElevatedButtonWidget(
-                              buttonText: isFirstTimeTrial ? "Free Trial" : "Send Invite",
+                              buttonText: isFirstTimeTrial
+                                  ? "Free Trial"
+                                  : (widget.isAlreadyHired ? "Confirm Booking" : "Send Invite"),
                               buttonColor: const Color(0xff0f766e),
                               textColor: Colors.white,
                               onTap: _submitBookingAndInvite,
@@ -494,13 +467,21 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
   }
 
   Future<List<Map<String, dynamic>>> _fetchTutorSlots() async {
-    final response = await supabase
-        .from('tutor_availability')
-        .select()
-        .eq('tutor_id', widget.tutorId)
-        .order('created_at', ascending: true);
+    try {
+      final response = await supabase
+          .from('tutor_availability')
+          .select()
+          .eq('tutor_id', widget.tutorId)
+          .order('created_at', ascending: true);
 
-    return List<Map<String, dynamic>>.from(response);
+      return (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+    } catch (e) {
+      debugPrint("❌ Error fetching slots: $e");
+      return [];
+    }
   }
 
   bool _isSlotPassed(String slotDay, String? startTimeStr) {
@@ -630,7 +611,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
           // Slots List
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _fetchTutorSlots(),
+              future: _slotsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator(color: Color(0xff0f766e)));
@@ -714,6 +695,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
             ),
           ),
 
+          // Bottom Action Button
           Container(
             padding: const EdgeInsets.all(16.0),
             color: Colors.white,
@@ -725,15 +707,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
                   backgroundColor: const Color(0xff0f766e),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                onPressed: isBooking
-                    ? null
-                    : () {
-                  if (widget.isAlreadyHired) {
-                    _bookDirectSlot();
-                  } else {
-                    _showInviteDialog();
-                  }
-                },
+                onPressed: isBooking ? null : _showInviteDialog,
                 child: isBooking
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text(
