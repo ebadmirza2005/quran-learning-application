@@ -85,4 +85,24 @@ class NotificationService {
       debugPrint("❌ Error saving FCM token: $e");
     }
   }
+
+  static Future<void> sendPushNotification({
+    required String recipientFcmToken,
+    required String title,
+    required String body,
+    Map<String,dynamic>? dataPayLoad,
+
+}) async {
+    try {
+      await _supabase.functions.invoke('send-push-notification', body: {
+        'to': recipientFcmToken,
+        'title': title,
+        'body': body,
+        'data': dataPayLoad ?? {},
+      });
+      debugPrint("✅ Push notification sent successfully to $recipientFcmToken");
+    }catch (e) {
+      debugPrint("❌ Error sending push notification: $e");
+    }
+  }
 }

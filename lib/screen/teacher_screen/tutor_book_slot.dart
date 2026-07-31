@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:quran_learning_application/services/invite_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/button.dart';
 import '../../utils/drop_down_widget.dart';
@@ -7,11 +8,13 @@ import '../../utils/text.dart';
 
 class TutorBookSlot extends StatefulWidget {
   final String tutorId;
+  final String subjectName;
   final bool isAlreadyHired;
 
   const TutorBookSlot({
     super.key,
     required this.tutorId,
+    this.subjectName = "Quran Class",
     this.isAlreadyHired = false,
   });
 
@@ -234,6 +237,12 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
           ),
           backgroundColor: const Color(0xff0f766e),
         ),
+      );
+      String inviteSubject = chosenSkills.isNotEmpty ? chosenSkills.join(', ') : "Quran Studies";
+
+      await InviteService.sendInvite(
+        tutorId: widget.tutorId,
+        subjectName: inviteSubject,
       );
     } catch (e) {
       if (mounted) {
