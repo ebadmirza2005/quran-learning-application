@@ -240,7 +240,7 @@ class _TutorBookSlotState extends State<TutorBookSlot> {
       );
       String inviteSubject = chosenSkills.isNotEmpty ? chosenSkills.join(', ') : "Quran Studies";
 
-      await InviteService.sendInvite(
+      await InviteService.sendInviteNotification(
         tutorId: widget.tutorId,
         subjectName: inviteSubject,
       );
