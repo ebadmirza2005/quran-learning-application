@@ -5,16 +5,15 @@ import 'notification_service.dart';
 class InviteService {
   static final _supabase = Supabase.instance.client;
 
-  static Future<void> sendInvite({
+  static Future<void> sendInviteNotification({
     required String tutorId,
     required String subjectName,
-    String duration = "1 Hour", // 👈 Duration yahan add karein (Default 1 Hour)
   }) async {
     final currentUser = _supabase.auth.currentUser;
     if (currentUser == null) return;
 
     try {
-      // 1. Student Name Fetch
+      // 1. Student Name Fetch Karein
       final studentData = await _supabase
           .from('students')
           .select('full_name, name')
@@ -24,18 +23,7 @@ class InviteService {
       final String studentName =
           studentData?['full_name'] ?? studentData?['name'] ?? "A Student";
 
-      // 2. Invites Table Me Insert (Duration Pass Kar Diya Hai)
-      await _supabase.from('invites').insert({
-        'student_id': currentUser.id,
-        'tutor_id': tutorId,
-        'subject': subjectName,
-        'duration': duration, // 👈 Null error yahan se fix ho jayega
-        'status': 'pending',
-        'created_at': DateTime.now().toIso8601String(),
-      });
-      debugPrint("✅ Invite saved in database.");
-
-      // 3. Tutor FCM Token Fetch
+      // 2. Tutor (Receiver) ka FCM Token Fetch Karein
       final tutorData = await _supabase
           .from('tutors')
           .select('fcm_token')
@@ -44,7 +32,7 @@ class InviteService {
 
       final String? tutorFcmToken = tutorData?['fcm_token'];
 
-      // 4. Notification Dispatch
+      // 3. Simple Push Notification Send Karein (No duplicate DB insert!)
       if (tutorFcmToken != null && tutorFcmToken.isNotEmpty) {
         await NotificationService.sendPushNotification(
           recipientFcmToken: tutorFcmToken,
@@ -53,16 +41,15 @@ class InviteService {
           dataPayLoad: {
             'type': 'invite',
             'student_id': currentUser.id,
-            'tutor_id': tutorId,
-            'subject': subjectName,
-            'duration': duration,
-          },
+            'subject_name': subjectName,
+          }
         );
+        debugPrint("🚀 Invite Push Notification sent to Tutor!");
       } else {
-        debugPrint("⚠️ Tutor FCM Token missing.");
+        debugPrint("⚠️ Tutor FCM Token missing or tutor is offline.");
       }
     } catch (e) {
-      debugPrint("❌ Send Invite Error: $e");
+      debugPrint("❌ Notification Send Error: $e");
     }
   }
 }
