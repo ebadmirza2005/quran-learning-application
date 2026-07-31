@@ -7,7 +7,6 @@ class ChatService {
   static Future<void> sendMessage({
     required String receiverId,
     required String messageText,
-    required String senderName,
     required bool isReceiverTutor,
   }) async {
     final currentUser = _supabase.auth.currentUser;
@@ -23,6 +22,27 @@ class ChatService {
       });
       debugPrint("✅ Message saved in Supabase database.");
 
+      String actualSenderName = "Someone";
+
+      final studentSender = await _supabase
+          .from('students')
+          .select('full_name, name')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+      if (studentSender != null) {
+        actualSenderName = studentSender['full_name'] ?? studentSender['name'] ?? "Someone";
+      } else {
+        final tutorSender = await _supabase
+            .from('tutors')
+            .select('full_name, name')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+        if (tutorSender != null) {
+          actualSenderName = tutorSender['full_name'] ?? tutorSender['name'] ?? "Someone";
+        }
+      }
+
       final targetTable = isReceiverTutor ? 'tutors' : 'students';
 
       final receiverData = await _supabase
@@ -36,16 +56,16 @@ class ChatService {
       if (fcmToken != null && fcmToken.isNotEmpty) {
         await _supabase.functions.invoke('send-push-notification', body: {
           'to': fcmToken,
-          'title': "New Message from $senderName",
+          'title': "New Message from $actualSenderName",
           'body': messageText,
           'data': {
             'type': 'chat',
             'sender_id': currentUser.id,
           }
         });
-        debugPrint("🚀 Push Notification dispatched to FCM Token!");
+        debugPrint("🚀 Push Notification dispatched to $actualSenderName!");
       } else {
-        debugPrint("⚠️ Receiver FCM Token not found (User might be offline or logged out).");
+        debugPrint("⚠️ Receiver FCM Token not found.");
       }
     } catch (e) {
       debugPrint("❌ Chat Send Error: $e");
